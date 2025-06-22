@@ -63,8 +63,8 @@ export default function JetWinAviator() {
 
   const audioRef = useRef<HTMLAudioElement>(null)
   const crashAudioRef = useRef<HTMLAudioElement>(null)
-  const gameIntervalRef = useRef<NodeJS.Timeout>()
-  const dataUpdateIntervalRef = useRef<NodeJS.Timeout>()
+  const gameIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const dataUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const crashPointRef = useRef<number>(1.0)
   const manualCashoutRef = useRef<boolean>(false)
 
@@ -557,20 +557,76 @@ export default function JetWinAviator() {
     return "bg-red-600 text-white border-red-500"
   }
 
-  const planePosition = {
-    left: gameState === "flying" ? `${Math.min(90, 5 + (multiplier - 1) * 8)}%` : "5%",
-    bottom: gameState === "flying" ? `${Math.min(85, 5 + (multiplier - 1) * 6)}%` : "5%",
-  }
-
-  // Calculate trajectory path for the red arc
+  // Calculate trajectory path for the graph line
   const getTrajectoryPath = () => {
     if (gameState !== "flying") return ""
 
     const leftPercent = Number.parseFloat(planePosition.left)
     const bottomPercent = Number.parseFloat(planePosition.bottom)
 
-    return `M 0 95 Q ${leftPercent / 2} ${95 - bottomPercent / 2} ${leftPercent} ${95 - bottomPercent}`
+    // Create a smooth graph line that follows the plane's path
+    const startX = 5
+    const startY = 95
+    const endX = leftPercent
+    const endY = 95 - bottomPercent
+    
+    // Create a smooth curve with multiple control points for a more natural graph
+    const controlX1 = startX + (endX - startX) * 0.25
+    const controlY1 = startY - 15
+    const controlX2 = startX + (endX - startX) * 0.75
+    const controlY2 = startY - bottomPercent * 0.6
+
+    return `M ${startX} ${startY} Q ${controlX1} ${controlY1} ${controlX2} ${controlY2} T ${endX} ${endY}`
   }
+
+  // Generate graph points for the trail effect
+  const getGraphPoints = () => {
+    if (gameState !== "flying") return []
+    
+    const points = []
+    const steps = 50
+    const progress = (multiplier - 1) / (crashPointRef.current - 1)
+    
+    for (let i = 0; i <= steps; i++) {
+      const stepProgress = (i / steps) * progress
+      const left = 5 + (stepProgress * 85)
+      const bottom = 5 + (stepProgress * 80)
+      points.push({ x: left, y: 95 - bottom })
+    }
+    
+    return points
+  }
+
+  // Calculate plane position with more realistic movement
+  const getPlanePosition = () => {
+    if (gameState !== "flying") {
+      return {
+        left: "5%",
+        bottom: "5%",
+        transform: "rotate(-15deg)", // Slight upward tilt when waiting
+      }
+    }
+
+    // More realistic movement calculation
+    const progress = (multiplier - 1) / (crashPointRef.current - 1)
+    const maxLeft = 85
+    const maxBottom = 80
+    
+    // Start from bottom and move diagonally upward
+    const left = 5 + (progress * maxLeft)
+    const bottom = 5 + (progress * maxBottom)
+    
+    // Dynamic rotation - start with slight upward tilt and gradually increase
+    const rotation = -5 - (progress * 20) // Start at -5deg, end at -25deg (natural takeoff angle)
+    
+    return {
+      left: `${left}%`,
+      bottom: `${bottom}%`,
+      transform: `rotate(${rotation}deg)`,
+    }
+  }
+
+  const planePosition = getPlanePosition()
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
@@ -653,10 +709,10 @@ export default function JetWinAviator() {
         </div>
       </header>
 
-      <div className="flex flex-col md:flex-row flex-1 max-h-screen">
+      <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] md:h-[calc(100vh-80px)] overflow-hidden">
         {/* Left Sidebar - Desktop Only */}
-        <div className="hidden md:block w-80 bg-gray-800 border-r border-gray-700 flex flex-col max-h-screen">
-          <div className="p-4 border-b border-gray-700">
+        <div className="hidden md:flex w-80 bg-gray-800 border-r border-gray-700 flex-col h-full">
+          <div className="p-4 border-b border-gray-700 flex-shrink-0">
             <div className="flex space-x-2 mb-4">
               <Button
                 variant={activeTab === "All Bets" ? "default" : "outline"}
@@ -676,7 +732,7 @@ export default function JetWinAviator() {
                   activeTab === "Previous" ? "bg-gray-700 text-white" : "bg-transparent border-gray-600 text-gray-400"
                 }
               >
-                Previous
+                Top
               </Button>
               <Button
                 variant={activeTab === "Top" ? "default" : "outline"}
@@ -696,7 +752,7 @@ export default function JetWinAviator() {
 
           <div className="flex-1 overflow-y-auto p-4">
             <div className="space-y-2">
-              <div className="grid grid-cols-4 text-xs text-gray-400 mb-2">
+              <div className="grid grid-cols-4 text-xs text-gray-400 mb-2 sticky top-0 bg-gray-800 py-2 z-10">
                 <span>Player</span>
                 <span>Bet KES</span>
                 <span>X</span>
@@ -726,10 +782,10 @@ export default function JetWinAviator() {
           </div>
         </div>
 
-        {/* Main Game Area */}
-        <div className="flex-1 min-w-0 relative flex flex-col max-h-screen overflow-y-auto">
+        {/* Main Game Area - Fixed at bottom */}
+        <div className="flex-1 min-w-0 flex flex-col h-full">
           {/* Previous Multipliers */}
-          <div className="bg-gray-800 p-2 md:p-4 border-b border-gray-700">
+          <div className="bg-gray-800 p-2 md:p-4 border-b border-gray-700 flex-shrink-0">
             <div className="flex items-center space-x-2 overflow-x-auto">
               {previousMultipliers.map((mult, index) => (
                 <Badge
@@ -745,55 +801,88 @@ export default function JetWinAviator() {
 
           {/* Game Canvas */}
           <div
-            className="relative h-64 md:h-96 overflow-hidden"
+            className="relative h-64 md:h-96 overflow-hidden flex-shrink-0"
             style={{
               background: `
-                radial-gradient(ellipse at center, rgba(0,0,0,0.9) 0%, rgba(16,33,62,0.8) 25%, rgba(15,52,96,0.7) 50%, rgba(83,52,131,0.6) 75%, rgba(114,9,183,0.5) 100%),
-                linear-gradient(45deg, transparent 24%, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.05) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.05) 75%, rgba(255,255,255,0.05) 76%, transparent 77%, transparent),
-                linear-gradient(-45deg, transparent 24%, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.05) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.05) 75%, rgba(255,255,255,0.05) 76%, transparent 77%, transparent)
+                radial-gradient(ellipse at center, rgba(0,0,0,0.95) 0%, rgba(16,33,62,0.9) 20%, rgba(15,52,96,0.8) 40%, rgba(83,52,131,0.7) 60%, rgba(114,9,183,0.6) 80%, rgba(147,51,234,0.5) 100%),
+                linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.03) 50%, transparent 70%),
+                linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.02) 50%, transparent 60%)
               `,
-              backgroundSize: "100% 100%, 30px 30px, 30px 30px",
-              animation: gameState === "flying" ? "moveBackground 2s linear infinite" : "none",
+              backgroundSize: "100% 100%, 100px 100px, 80px 80px",
+              animation: gameState === "flying" ? "moveBackground 3s linear infinite" : "none",
             }}
           >
-            {/* Red Trajectory Line and Area */}
+            {/* Graph Trail and Line */}
             {gameState === "flying" && (
               <>
                 <svg className="absolute inset-0 w-full h-full pointer-events-none">
                   <defs>
-                    <linearGradient id="trajectoryGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <linearGradient id="graphGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                       <stop offset="0%" stopColor="#ef4444" stopOpacity="0.8" />
+                      <stop offset="50%" stopColor="#ef4444" stopOpacity="0.6" />
                       <stop offset="100%" stopColor="#ef4444" stopOpacity="0.3" />
                     </linearGradient>
+                    <filter id="graphGlow">
+                      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                      <feMerge> 
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                      </feMerge>
+                    </filter>
                   </defs>
 
-                  {/* Red trajectory line */}
-                  <path d={getTrajectoryPath()} stroke="#ef4444" strokeWidth="3" fill="none" strokeLinecap="round" />
+                  {/* Graph line with trail effect */}
+                  <path 
+                    d={getTrajectoryPath()} 
+                    stroke="#ef4444" 
+                    strokeWidth="3" 
+                    fill="none" 
+                    strokeLinecap="round"
+                    filter="url(#graphGlow)"
+                    opacity="0.9"
+                  />
 
-                  {/* Red area fill */}
+                  {/* Graph trail dots */}
+                  {getGraphPoints().map((point, index) => (
+                    <circle
+                      key={index}
+                      cx={`${point.x}%`}
+                      cy={`${point.y}%`}
+                      r="1.5"
+                      fill="#ef4444"
+                      opacity={0.6 - (index * 0.01)}
+                    />
+                  ))}
+
+                  {/* Graph area fill */}
                   <path
-                    d={`${getTrajectoryPath()} L ${planePosition.left} 100 L 0 100 Z`}
-                    fill="url(#trajectoryGradient)"
-                    opacity="0.3"
+                    d={`${getTrajectoryPath()} L ${planePosition.left} 100 L 5 100 Z`}
+                    fill="url(#graphGradient)"
+                    opacity="0.1"
                   />
                 </svg>
               </>
             )}
 
-            {/* Plane */}
+            {/* Plane with enhanced styling */}
             <div
-              className="absolute transition-all duration-100 transform"
+              className="absolute transition-all duration-75 transform"
               style={{
                 left: planePosition.left,
                 bottom: planePosition.bottom,
-                transform: "rotate(15deg)",
+                transform: planePosition.transform,
+                filter: gameState === "flying" ? "drop-shadow(0 0 10px rgba(255,255,255,0.3))" : "none",
               }}
             >
               <img
                 src="/plane.svg"
                 alt="Plane"
-                className="w-12 h-12 md:w-20 md:h-20"
-                style={{ filter: "brightness(1.2)" }}
+                className="w-16 h-16 md:w-24 md:h-24"
+                style={{ 
+                  filter: gameState === "flying" ? "brightness(1.3) drop-shadow(0 0 5px rgba(255,255,255,0.5))" : "brightness(1.2)",
+                  animation: gameState === "flying" ? "planeGlow 1s ease-in-out infinite alternate" : "none",
+                  transform: "scaleX(1.2) scaleY(1.1)",
+                }}
               />
             </div>
 
@@ -811,17 +900,20 @@ export default function JetWinAviator() {
                   </div>
                 </div>
               ) : gameState === "flying" ? (
-                <div className="text-6xl md:text-8xl font-bold text-white">{multiplier.toFixed(2)}x</div>
+                <div className="text-6xl md:text-8xl font-bold text-white drop-shadow-lg" style={{
+                  textShadow: "0 0 20px rgba(255,255,255,0.5)",
+                  animation: "multiplierPulse 0.5s ease-in-out infinite alternate"
+                }}>
+                  {multiplier.toFixed(2)}x
+                </div>
               ) : (
-                <div className="text-4xl md:text-6xl font-bold text-red-400">FLEW AWAY!</div>
+                <div className="text-4xl md:text-6xl font-bold text-red-400 drop-shadow-lg">FLEW AWAY!</div>
               )}
             </div>
           </div>
 
-          {/* Footer - Positioned here before betting panel */}
-
-          {/* Betting Panel */}
-          <div className="bg-gray-800 p-4 md:p-6">
+          {/* Betting Panel - Fixed at bottom */}
+          <div className="bg-gray-800 p-4 md:p-6 flex-shrink-0">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               {/* Bet 1 */}
               <div className="bg-gray-700 border border-gray-600 p-4 rounded-lg">
@@ -1085,8 +1177,8 @@ export default function JetWinAviator() {
             </div>
           </div>
 
-          {/* Footer - Final element, no content below */}
-          <footer className="bg-gray-800 border-t border-gray-700 p-4 text-center">
+          {/* Footer - Fixed at bottom */}
+          <footer className="bg-gray-800 border-t border-gray-700 p-4 text-center flex-shrink-0">
             <div className="flex items-center justify-center space-x-2 mb-2">
               <span className="text-sm text-gray-400">✓ Provably Fair Game</span>
             </div>
@@ -1095,8 +1187,8 @@ export default function JetWinAviator() {
         </div>
 
         {/* Right Sidebar - Desktop Only - Scrollable */}
-        <div className="hidden md:block w-80 bg-gray-800 border-l border-gray-700 flex flex-col max-h-screen">
-          <div className="p-4 border-b border-gray-700">
+        <div className="hidden md:flex w-80 bg-gray-800 border-l border-gray-700 flex-col h-full">
+          <div className="p-4 border-b border-gray-700 flex-shrink-0">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-semibold">Cashout History</span>
               <Button
@@ -1171,7 +1263,7 @@ export default function JetWinAviator() {
       </div>
 
       {/* Mobile Tabs */}
-      <div className="md:hidden flex bg-gray-800 border-t border-gray-700">
+      <div className="md:hidden flex bg-gray-800 border-t border-gray-700 flex-shrink-0">
         {["All Bets", "Previous", "Top"].map((tab) => (
           <Button
             key={tab}
@@ -1185,7 +1277,7 @@ export default function JetWinAviator() {
       </div>
 
       {/* Mobile Bets List - Scrollable */}
-      <div className="md:hidden bg-gray-900 p-4 flex-1 overflow-y-auto max-h-96">
+      <div className="md:hidden bg-gray-900 p-4 overflow-y-auto flex-1" style={{ height: 'calc(100vh - 64px - 200px)' }}>
         <div className="text-sm text-gray-400 mb-2">{activeTab.toUpperCase()}</div>
         <div className="text-lg font-bold mb-4">{getCurrentBets().length.toLocaleString()}</div>
 
@@ -1246,7 +1338,27 @@ export default function JetWinAviator() {
             background-position: 0 0, 0 0, 0 0;
           }
           100% {
-            background-position: 0 0, 30px 30px, -30px 30px;
+            background-position: 0 0, 100px 100px, -80px 80px;
+          }
+        }
+
+        @keyframes planeGlow {
+          0% {
+            filter: brightness(1.3) drop-shadow(0 0 5px rgba(255,255,255,0.5));
+          }
+          100% {
+            filter: brightness(1.5) drop-shadow(0 0 15px rgba(255,255,255,0.8));
+          }
+        }
+
+        @keyframes multiplierPulse {
+          0% {
+            text-shadow: 0 0 20px rgba(255,255,255,0.5);
+            transform: scale(1);
+          }
+          100% {
+            text-shadow: 0 0 30px rgba(255,255,255,0.8);
+            transform: scale(1.05);
           }
         }
       `}</style>
