@@ -408,61 +408,177 @@ export default function JetWinAviator() {
     }
   }
 
+  // 🎯 BETTING FUNCTIONALITY - Place a bet when button is clicked
+  const placeBet = () => {
+    // ✅ Check if game is in waiting state (can only bet before plane takes off)
+    if (gameState !== "waiting") {
+      console.log("❌ Cannot place bet - game already started")
+      return
+    }
+
+    // ✅ Check if player has sufficient balance
+    if (betAmount > balance) {
+      console.log("❌ Insufficient balance for bet")
+      return
+    }
+
+    // ✅ Check if bet is already active (prevent double betting)
+    if (betActive) {
+      console.log("❌ Bet already placed for this round")
+      return
+    }
+
+    // 🎲 PLACE THE BET - Deduct amount from balance and activate bet
+    console.log(`🎯 Placing bet: $${betAmount.toFixed(2)}`)
+    setBetActive(true)
+    setBetCashed(false)
+    setBalance((prev) => {
+      const newBalance = prev - betAmount
+      console.log(`💰 Balance updated: $${prev.toFixed(2)} → $${newBalance.toFixed(2)}`)
+      return newBalance
+    })
+
+    console.log("✅ Bet placed successfully!")
+  }
+
+  // 🤖 AUTO-BET FUNCTIONALITY - Automatically place bets each round
+  const handleAutoBet = () => {
+    if (!autoBet) return
+
+    console.log("🤖 Auto-bet triggered")
+
+    // ✅ Check if we have enough balance for auto-bet
+    if (betAmount <= balance) {
+      console.log(`🎯 Auto-placing bet: $${betAmount.toFixed(2)}`)
+      placeBet()
+    } else {
+      console.log("❌ Auto-bet cancelled - insufficient balance")
+      setAutoBet(false) // Disable auto-bet if no funds
+    }
+  }
+
+  // 💰 CASH OUT FUNCTIONALITY - Cash out current bet at current multiplier
+  const cashOut = () => {
+    // ✅ Check if game is flying (can only cash out during flight)
+    if (gameState !== "flying") {
+      console.log("❌ Cannot cash out - plane not flying")
+      return
+    }
+
+    // ✅ Check if bet is active and not already cashed out
+    if (!betActive || betCashed) {
+      console.log("❌ No active bet to cash out")
+      return
+    }
+
+    // 💰 CALCULATE WINNINGS
+    const winAmount = betAmount * multiplier
+    console.log(`💰 Cashing out: $${betAmount.toFixed(2)} × ${multiplier.toFixed(2)} = $${winAmount.toFixed(2)}`)
+
+    if (isAdmin) {
+      // 👑 ADMIN MODE - Allow successful cashout
+      console.log("👑 Admin mode - cashout successful")
+      setBetCashed(true)
+      setBalance((prev) => {
+        const newBalance = prev + winAmount
+        console.log(`💰 Balance updated: $${prev.toFixed(2)} → $${newBalance.toFixed(2)}`)
+        return newBalance
+      })
+    } else {
+      // 🎲 REGULAR MODE - Crash on cashout attempt (realistic casino behavior)
+      console.log("🎲 Regular mode - triggering crash on cashout attempt")
+      setTimeout(
+        () => {
+          console.log("💥 Manual crash triggered!")
+          manualCashoutRef.current = true
+        },
+        Math.random() * 50 + 10, // Random delay 10-60ms
+      )
+    }
+  }
+
+  // 🤖 AUTO CASH-OUT FUNCTIONALITY
+  const handleAutoCashOut = (currentMultiplier: number) => {
+    if (!autoCash || !betActive || betCashed) return
+
+    // ✅ Check if current multiplier reached auto cash-out target
+    if (currentMultiplier >= autoCashout) {
+      console.log(`🤖 Auto cash-out triggered at ${currentMultiplier.toFixed(2)}x (target: ${autoCashout}x)`)
+
+      if (isAdmin) {
+        // 👑 Admin mode - successful auto cash-out
+        const winAmount = betAmount * autoCashout
+        console.log(`💰 Auto cash-out successful: $${winAmount.toFixed(2)}`)
+        setBetCashed(true)
+        setBalance((prev) => prev + winAmount)
+      } else {
+        // 🎲 Regular mode - crash on auto cash-out
+        console.log("🎲 Auto cash-out triggered crash")
+        manualCashoutRef.current = true
+      }
+    }
+  }
+
   const startGame = useCallback(() => {
     if (gameState !== "waiting") return
 
+    // 🎲 Generate crash point for this round
     crashPointRef.current = generateCrashPoint()
+    console.log(`🎯 New round starting - crash point: ${crashPointRef.current.toFixed(2)}x`)
+
     manualCashoutRef.current = false
     setGameState("flying")
     setMultiplier(1.0)
     setBetCashed(false)
 
+    // 🎵 Play takeoff sound
     playTakeoffSound()
 
     let currentMultiplier = 1.0
-    // More unpredictable speed variations
-    const speedVariations = [0.6, 0.8, 1.0, 1.2, 1.5, 1.8]
-    const baseSpeed = speedVariations[Math.floor(Math.random() * speedVariations.length)]
+    // 🚀 FAST/MEDIUM SPEED MOVEMENT - Not slow!
+    const speedOptions = [1.2, 1.5, 1.8, 2.0, 2.2] // Fast to very fast speeds
+    const baseSpeed = speedOptions[Math.floor(Math.random() * speedOptions.length)]
+    console.log(`🚀 Plane speed for this round: ${baseSpeed}x`)
 
     gameIntervalRef.current = setInterval(() => {
-      // Add random speed fluctuations during flight
-      const speedFluctuation = 0.8 + Math.random() * 0.4 // 0.8 to 1.2
-      const increment = (0.01 + currentMultiplier * 0.001) * baseSpeed * speedFluctuation
+      // 🎢 DYNAMIC SPEED FLUCTUATIONS - Fast up/down movement
+      const speedFluctuation = 0.9 + Math.random() * 0.4 // 0.9 to 1.3
+      const increment = (0.015 + currentMultiplier * 0.002) * baseSpeed * speedFluctuation
       currentMultiplier += increment
       setMultiplier(currentMultiplier)
 
-      // Admin mode - allow normal cashouts
-      if (isAdmin) {
-        if (autoCash && betActive && !betCashed && currentMultiplier >= autoCashout) {
-          setBetCashed(true)
-          const winAmount = betAmount * autoCashout
-          setBalance((prev) => prev + winAmount)
-        }
-      }
+      // 🤖 Check auto cash-out
+      handleAutoCashOut(currentMultiplier)
 
-      // Check crash condition
+      // 💥 Check crash condition
       if (currentMultiplier >= crashPointRef.current || manualCashoutRef.current) {
+        console.log(`💥 Game crashed at ${currentMultiplier.toFixed(2)}x`)
         setGameState("crashed")
         clearInterval(gameIntervalRef.current!)
         playCrashSound()
 
+        // 📊 Update multiplier history
         setPreviousMultipliers((prev) => {
           const newMultipliers = [Number(currentMultiplier.toFixed(2)), ...prev.slice(0, 24)]
           return newMultipliers
         })
 
+        // ⏰ Reset game after 3 seconds
         setTimeout(() => {
+          console.log("🔄 Resetting game for next round")
           setGameState("waiting")
           setBetActive(false)
           setBetCashed(false)
 
+          // 🤖 Trigger auto-bet for next round
           if (autoBet) {
-            setTimeout(() => placeBet(), 1000)
+            console.log("🤖 Auto-bet enabled - will place bet in next round")
+            setTimeout(() => handleAutoBet(), 1000)
           }
         }, 3000)
       }
-    }, 50)
-  }, [gameState, generateCrashPoint, autoCash, autoCashout, betActive, betCashed, betAmount, autoBet, isAdmin])
+    }, 40) // Faster interval for smoother movement
+  }, [gameState, generateCrashPoint, betActive, betCashed, betAmount, autoBet, autoCash, autoCashout, isAdmin])
 
   useEffect(() => {
     if (gameState === "waiting") {
@@ -476,80 +592,56 @@ export default function JetWinAviator() {
     }
   }, [gameState, startGame])
 
-  const placeBet = () => {
-    if (gameState !== "waiting") return
-    if (betAmount > balance) return
-
-    setBetActive(true)
-    setBetCashed(false)
-    setBalance((prev) => prev - betAmount)
-  }
-
-  const cashOut = () => {
-    if (gameState !== "flying") return
-    if (betCashed) return
-
-    if (isAdmin) {
-      if (betActive) {
-        setBetCashed(true)
-        const winAmount = betAmount * multiplier
-        setBalance((prev) => prev + winAmount)
-      }
-    } else {
-      setTimeout(
-        () => {
-          manualCashoutRef.current = true
-        },
-        Math.random() * 50 + 10,
-      )
-    }
-  }
-
-  const getCurrentBets = () => {
-    switch (activeTab) {
-      case "Previous":
-        return previousBets
-      case "Top":
-        return topBets
-      default:
-        return allBets
-    }
-  }
-
-  const getMultiplierColor = (mult: number) => {
-    if (mult >= 100) return "bg-purple-600 text-white border-purple-500"
-    if (mult >= 10) return "bg-yellow-600 text-white border-yellow-500"
-    if (mult >= 2) return "bg-green-600 text-white border-green-500"
-    if (mult >= 1.5) return "bg-blue-600 text-white border-blue-500"
-    return "bg-red-600 text-white border-red-500"
-  }
-
-  // Unpredictable plane movement with random variations
+  // ✈️ PLANE MOVEMENT - Starts at 0,0 and moves fast up/down
   const getUnpredictablePlanePosition = () => {
-    if (gameState !== "flying") return { left: "5%", bottom: "5%", transform: "rotate(15deg)" }
+    if (gameState !== "flying") {
+      // 🏁 STARTING POSITION - Bottom left corner (0,0)
+      return { left: "2%", bottom: "2%", transform: "rotate(15deg)" }
+    }
 
-    // Base position calculation
-    const baseLeft = Math.min(90, 5 + (multiplier - 1) * 8)
-    const baseBottom = Math.min(85, 5 + (multiplier - 1) * 6)
+    // 📈 FAST MOVEMENT CALCULATION - Base position grows with multiplier
+    const baseLeft = Math.min(85, 2 + (multiplier - 1) * 12) // Faster horizontal movement
+    const baseBottom = Math.min(80, 2 + (multiplier - 1) * 10) // Faster vertical movement
 
-    // Add unpredictable variations
-    const leftVariation = Math.sin(multiplier * 2) * 5 // Oscillating movement
-    const bottomVariation = Math.cos(multiplier * 1.5) * 3 + Math.random() * 2 - 1 // Random up/down
+    // 🎢 FAST UP/DOWN VARIATIONS - Quick oscillations
+    const fastOscillation = Math.sin(multiplier * 3) * 8 // Faster, bigger oscillations
+    const quickVariation = Math.cos(multiplier * 2.5) * 5 + Math.random() * 3 - 1.5
 
-    // Sometimes make dramatic movements
-    const dramaticMove = Math.random() < 0.1 ? (Math.random() - 0.5) * 10 : 0
+    // 💨 DRAMATIC FAST MOVEMENTS - 15% chance for quick direction changes
+    const dramaticMove = Math.random() < 0.15 ? (Math.random() - 0.5) * 15 : 0
 
-    const finalLeft = Math.max(5, Math.min(90, baseLeft + leftVariation + dramaticMove))
-    const finalBottom = Math.max(5, Math.min(85, baseBottom + bottomVariation))
+    const finalLeft = Math.max(2, Math.min(85, baseLeft + fastOscillation + dramaticMove))
+    const finalBottom = Math.max(2, Math.min(80, baseBottom + quickVariation))
 
-    // Dynamic rotation based on movement
-    const rotation = 15 + Math.sin(multiplier) * 10 + (Math.random() - 0.5) * 5
+    // 🔄 DYNAMIC ROTATION - Based on movement direction and speed
+    const rotation = 15 + Math.sin(multiplier * 1.5) * 15 + (Math.random() - 0.5) * 8
 
     return {
       left: `${finalLeft}%`,
       bottom: `${finalBottom}%`,
       transform: `rotate(${rotation}deg)`,
     }
+  }
+
+  // 📍 DOTTED TRAIL PATH - Creates dotted line following plane movement
+  const getDottedTrailPath = () => {
+    if (gameState !== "flying") return ""
+
+    const currentPos = getUnpredictablePlanePosition()
+    const leftPercent = Number.parseFloat(currentPos.left)
+    const bottomPercent = Number.parseFloat(currentPos.bottom)
+
+    // 🛤️ CREATE CURVED DOTTED PATH from start (2,2) to current position
+    const startX = 2
+    const startY = 98 // SVG coordinates (bottom = 98 for 2% from bottom)
+    const endX = leftPercent
+    const endY = 100 - bottomPercent
+
+    // 📈 CURVED PATH with control points for smooth trajectory
+    const midX = (startX + endX) / 2 + Math.sin(multiplier) * 5
+    const midY = (startY + endY) / 2 + Math.cos(multiplier) * 3
+
+    return `M ${startX} ${startY} Q ${midX} ${midY} ${endX} ${endY}`
   }
 
   const planePosition = getUnpredictablePlanePosition()
@@ -604,6 +696,20 @@ export default function JetWinAviator() {
       flewAudioRef.current.play()
     }
   }, [gameState])
+
+  const getCurrentBets = () => {
+    if (activeTab === "All Bets") return allBets
+    if (activeTab === "Previous") return previousBets
+    return topBets
+  }
+
+  const getMultiplierColor = (multiplier: number) => {
+    if (multiplier <= 1.0) return "bg-red-500 text-white"
+    if (multiplier <= 2.0) return "bg-orange-500 text-white"
+    if (multiplier <= 5.0) return "bg-yellow-500 text-black"
+    if (multiplier <= 10.0) return "bg-green-500 text-white"
+    return "bg-blue-500 text-white"
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
@@ -790,50 +896,39 @@ export default function JetWinAviator() {
                 linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.02) 50%, transparent 60%)
               `,
               backgroundSize: "100% 100%, 100px 100px, 80px 80px",
-              animation: gameState === "flying" ? "moveBackground 3s linear infinite" : "none",
+              animation: gameState === "flying" ? "moveBackground 2s linear infinite" : "none", // Faster background
             }}
           >
-            {/* Unpredictable Trajectory Line */}
+            {/* 🛤️ DOTTED TRAIL LINE - Shows plane's path */}
             {gameState === "flying" && (
               <>
-                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 10 }}>
+                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 8 }}>
                   <defs>
-                    <linearGradient id="trajectoryGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#ef4444" stopOpacity="0.8" />
-                      <stop offset="50%" stopColor="#ef4444" stopOpacity="0.6" />
-                      <stop offset="100%" stopColor="#ef4444" stopOpacity="0.3" />
+                    <linearGradient id="trailGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity="0.8" />
+                      <stop offset="50%" stopColor="#3b82f6" stopOpacity="0.6" />
+                      <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.4" />
                     </linearGradient>
-                    <filter id="trajectoryGlow">
-                      <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-                      <feMerge>
-                        <feMergeNode in="coloredBlur" />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
                   </defs>
 
-                  {/* Dynamic trajectory line */}
+                  {/* 📍 DOTTED TRAIL PATH */}
                   <path
-                    d={getTrajectoryPath()}
-                    stroke="#ef4444"
-                    strokeWidth="4"
+                    d={getDottedTrailPath()}
+                    stroke="url(#trailGradient)"
+                    strokeWidth="3"
                     fill="none"
                     strokeLinecap="round"
-                    filter="url(#trajectoryGlow)"
-                    opacity="0.95"
-                  />
-
-                  {/* Area fill under the curve */}
-                  <path
-                    d={`${getTrajectoryPath()} L ${planePosition.left} 100 L 0 100 Z`}
-                    fill="url(#trajectoryGradient)"
-                    opacity="0.13"
+                    strokeDasharray="8 4" // Dotted pattern
+                    opacity="0.9"
+                    style={{
+                      animation: "dashMove 1s linear infinite", // Animated dots
+                    }}
                   />
                 </svg>
               </>
             )}
 
-            {/* Lighter, Faster Plane */}
+            {/* ✈️ PLANE WITH ATTACHED MULTIPLIER */}
             <div
               className="absolute transition-all duration-75 transform"
               style={{
@@ -841,25 +936,50 @@ export default function JetWinAviator() {
                 bottom: planePosition.bottom,
                 transform: planePosition.transform,
                 filter: gameState === "flying" ? "drop-shadow(0 0 10px rgba(255,255,255,0.3))" : "none",
+                zIndex: 15,
               }}
             >
-              {/* Lighter plane icon using emoji */}
+              {/* 🛩️ LIGHTER PLANE ICON */}
               <div
-                className="text-4xl md:text-6xl"
+                className="text-4xl md:text-6xl relative"
                 style={{
                   filter:
                     gameState === "flying"
                       ? "brightness(1.3) drop-shadow(0 0 5px rgba(255,255,255,0.5))"
                       : "brightness(1.2)",
-                  animation: gameState === "flying" ? "planeGlow 0.5s ease-in-out infinite alternate" : "none",
+                  animation: gameState === "flying" ? "planeGlow 0.3s ease-in-out infinite alternate" : "none", // Faster glow
                 }}
               >
                 ✈️
+                {/* 🪢 ROPE CONNECTION - Connects plane to multiplier */}
+                {gameState === "flying" && (
+                  <div
+                    className="absolute top-full left-1/2 w-0.5 bg-yellow-400 opacity-70"
+                    style={{
+                      height: "40px",
+                      transform: "translateX(-50%)",
+                      boxShadow: "0 0 4px rgba(255, 255, 0, 0.5)",
+                    }}
+                  />
+                )}
+                {/* 🏷️ MULTIPLIER TAG - Attached to plane like a banner */}
+                {gameState === "flying" && (
+                  <div
+                    className="absolute top-full left-1/2 transform -translate-x-1/2 mt-10"
+                    style={{
+                      animation: "multiplierSwing 2s ease-in-out infinite", // Swinging motion
+                    }}
+                  >
+                    <div className="bg-yellow-400 text-black px-3 py-1 rounded-full font-bold text-lg shadow-lg border-2 border-yellow-300">
+                      {multiplier.toFixed(2)}x
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Multiplier Display */}
-            <div className="absolute inset-0 flex items-center justify-center">
+            {/* 🎯 MAIN MULTIPLIER DISPLAY - Center of screen */}
+            <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 5 }}>
               {gameState === "waiting" ? (
                 <div className="text-center">
                   <div className="text-4xl md:text-6xl font-bold text-red-400 mb-4">UFC</div>
@@ -876,7 +996,7 @@ export default function JetWinAviator() {
                   className="text-6xl md:text-8xl font-bold text-white drop-shadow-lg"
                   style={{
                     textShadow: "0 0 20px rgba(255,255,255,0.5)",
-                    animation: "multiplierPulse 0.5s ease-in-out infinite alternate",
+                    animation: "multiplierPulse 0.3s ease-in-out infinite alternate", // Faster pulse
                   }}
                 >
                   {multiplier.toFixed(2)}x
@@ -1183,6 +1303,26 @@ export default function JetWinAviator() {
           100% {
             text-shadow: 0 0 30px rgba(255,255,255,0.8);
             transform: scale(1.05);
+          }
+        }
+
+        /* 🛤️ ANIMATED DOTTED TRAIL */
+        @keyframes dashMove {
+          0% {
+            stroke-dashoffset: 0;
+          }
+          100% {
+            stroke-dashoffset: 12;
+          }
+        }
+
+        /* 🪢 SWINGING MULTIPLIER TAG */
+        @keyframes multiplierSwing {
+          0%, 100% {
+            transform: translateX(-50%) rotate(-2deg);
+          }
+          50% {
+            transform: translateX(-50%) rotate(2deg);
           }
         }
       `}</style>
