@@ -163,11 +163,93 @@ export default function DepositPage() {
               <CardDescription className="text-gray-400">Pay with your debit or credit card</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8">
-                <CreditCard className="w-16 h-16 mx-auto text-gray-500 mb-4" />
-                <p className="text-gray-400">Card payments coming soon!</p>
-                <p className="text-sm text-gray-500 mt-2">Use M-Pesa for now</p>
-              </div>
+              <form className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="cardNumber" className="text-white">
+                    Card Number
+                  </Label>
+                  <Input
+                    id="cardNumber"
+                    type="text"
+                    placeholder="1234 5678 9012 3456"
+                    className="bg-gray-700 border-gray-600 text-white"
+                    maxLength={19}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="expiryDate" className="text-white">
+                      Expiry Date
+                    </Label>
+                    <Input
+                      id="expiryDate"
+                      type="text"
+                      placeholder="MM/YY"
+                      className="bg-gray-700 border-gray-600 text-white"
+                      maxLength={5}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cvv" className="text-white">
+                      CVV
+                    </Label>
+                    <Input
+                      id="cvv"
+                      type="text"
+                      placeholder="123"
+                      className="bg-gray-700 border-gray-600 text-white"
+                      maxLength={4}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cardName" className="text-white">
+                    Cardholder Name
+                  </Label>
+                  <Input
+                    id="cardName"
+                    type="text"
+                    placeholder="John Doe"
+                    className="bg-gray-700 border-gray-600 text-white"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cardAmount" className="text-white">
+                    Amount (KES)
+                  </Label>
+                  <Input
+                    id="cardAmount"
+                    type="number"
+                    placeholder="Enter amount"
+                    className="bg-gray-700 border-gray-600 text-white"
+                    min="10"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-white">Quick Amounts</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {quickAmounts.map((quickAmount) => (
+                      <Button
+                        key={quickAmount}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="bg-gray-700 border-gray-600 text-white"
+                      >
+                        {quickAmount >= 1000 ? `${quickAmount / 1000}K` : quickAmount}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3">
+                  Pay with Card
+                </Button>
+              </form>
             </CardContent>
           </Card>
         )}

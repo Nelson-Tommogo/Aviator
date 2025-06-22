@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Volume2, VolumeX, Bell, User, Menu, Info, X } from "lucide-react"
+import { Volume2, VolumeX, User, Menu, Info, X } from "lucide-react"
 import Link from "next/link"
 
 interface Bet {
@@ -82,7 +82,8 @@ export default function JetWinAviator() {
         if (audioRef.current) {
           audioRef.current.volume = 0.3
           audioRef.current.muted = false
-          // Try to play and immediately pause to initialize
+          audioRef.current.loop = true
+          // Create a user gesture to unlock audio
           const playPromise = audioRef.current.play()
           if (playPromise !== undefined) {
             await playPromise
@@ -95,6 +96,7 @@ export default function JetWinAviator() {
           crashAudioRef.current.muted = false
         }
         setAudioInitialized(true)
+        console.log("Audio initialized successfully")
       } catch (error) {
         console.log("Audio initialization failed:", error)
         // Retry after user interaction
@@ -345,15 +347,23 @@ export default function JetWinAviator() {
   }, [generateDummyData, updateDynamicData])
 
   const toggleMusic = async () => {
-    await initializeAudio()
+    if (!audioInitialized) {
+      await initializeAudio()
+    }
+
     setMusicEnabled(!musicEnabled)
 
     if (audioRef.current) {
       try {
-        if (musicEnabled) {
+        if (!musicEnabled) {
+          // Enabling music
+          if (gameState === "flying") {
+            audioRef.current.currentTime = 0
+            await audioRef.current.play()
+          }
+        } else {
+          // Disabling music
           audioRef.current.pause()
-        } else if (gameState === "flying") {
-          await audioRef.current.play()
         }
       } catch (error) {
         console.log("Audio toggle failed:", error)
@@ -365,7 +375,9 @@ export default function JetWinAviator() {
     if (audioRef.current && musicEnabled && audioInitialized) {
       try {
         audioRef.current.currentTime = 0
+        audioRef.current.loop = true
         await audioRef.current.play()
+        console.log("Takeoff sound playing")
       } catch (error) {
         console.log("Takeoff sound failed:", error)
       }
@@ -373,10 +385,16 @@ export default function JetWinAviator() {
   }
 
   const playCrashSound = async () => {
+    // Stop takeoff sound first
+    if (audioRef.current) {
+      audioRef.current.pause()
+    }
+
     if (crashAudioRef.current && musicEnabled && audioInitialized) {
       try {
         crashAudioRef.current.currentTime = 0
         await crashAudioRef.current.play()
+        console.log("Crash sound playing")
       } catch (error) {
         console.log("Crash sound failed:", error)
       }
@@ -579,7 +597,6 @@ export default function JetWinAviator() {
               <Button size="sm" variant="ghost" onClick={toggleMusic} className="p-1">
                 {musicEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
               </Button>
-              <Bell className="w-5 h-5" />
               <Link href="/login">
                 <Button size="sm" variant="ghost" className="p-1">
                   <User className="w-5 h-5" />
@@ -624,7 +641,6 @@ export default function JetWinAviator() {
             <Button size="sm" variant="ghost" onClick={toggleMusic}>
               {musicEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
             </Button>
-            <Bell className="w-5 h-5" />
             <Link href="/login">
               <Button size="sm" variant="ghost">
                 <User className="w-5 h-5" />
@@ -637,9 +653,9 @@ export default function JetWinAviator() {
         </div>
       </header>
 
-      <div className="flex flex-col md:flex-row flex-1">
+      <div className="flex flex-col md:flex-row flex-1 max-h-screen">
         {/* Left Sidebar - Desktop Only */}
-        <div className="hidden md:block w-80 bg-gray-800 border-r border-gray-700 flex flex-col">
+        <div className="hidden md:block w-80 bg-gray-800 border-r border-gray-700 flex flex-col max-h-screen">
           <div className="p-4 border-b border-gray-700">
             <div className="flex space-x-2 mb-4">
               <Button
@@ -711,7 +727,7 @@ export default function JetWinAviator() {
         </div>
 
         {/* Main Game Area */}
-        <div className="flex-1 min-w-0 relative flex flex-col">
+        <div className="flex-1 min-w-0 relative flex flex-col max-h-screen overflow-y-auto">
           {/* Previous Multipliers */}
           <div className="bg-gray-800 p-2 md:p-4 border-b border-gray-700">
             <div className="flex items-center space-x-2 overflow-x-auto">
@@ -803,12 +819,6 @@ export default function JetWinAviator() {
           </div>
 
           {/* Footer - Positioned here before betting panel */}
-          <footer className="bg-gray-800 border-t border-gray-700 p-4 text-center">
-            <div className="flex items-center justify-center space-x-2 mb-2">
-              <span className="text-sm text-gray-400">✓ Provably Fair Game</span>
-            </div>
-            <div className="text-xs text-gray-500">Powered by SPRIBE</div>
-          </footer>
 
           {/* Betting Panel */}
           <div className="bg-gray-800 p-4 md:p-6">
@@ -845,7 +855,14 @@ export default function JetWinAviator() {
                   >
                     -
                   </Button>
-                  <div className="text-2xl font-bold text-white min-w-[120px] text-center">{betAmount1.toFixed(2)}</div>
+                  <Input
+                    type="number"
+                    value={betAmount1.toFixed(2)}
+                    onChange={(e) => setBetAmount1(Math.max(0.01, Number.parseFloat(e.target.value) || 0.01))}
+                    className="text-2xl font-bold text-white min-w-[120px] text-center bg-gray-600 border-gray-500"
+                    step="0.01"
+                    min="0.01"
+                  />
                   <Button
                     variant="outline"
                     size="sm"
@@ -968,7 +985,14 @@ export default function JetWinAviator() {
                   >
                     -
                   </Button>
-                  <div className="text-2xl font-bold text-white min-w-[120px] text-center">{betAmount2.toFixed(2)}</div>
+                  <Input
+                    type="number"
+                    value={betAmount2.toFixed(2)}
+                    onChange={(e) => setBetAmount2(Math.max(0.01, Number.parseFloat(e.target.value) || 0.01))}
+                    className="text-2xl font-bold text-white min-w-[120px] text-center bg-gray-600 border-gray-500"
+                    step="0.01"
+                    min="0.01"
+                  />
                   <Button
                     variant="outline"
                     size="sm"
@@ -1060,6 +1084,14 @@ export default function JetWinAviator() {
               </div>
             </div>
           </div>
+
+          {/* Footer - Final element, no content below */}
+          <footer className="bg-gray-800 border-t border-gray-700 p-4 text-center">
+            <div className="flex items-center justify-center space-x-2 mb-2">
+              <span className="text-sm text-gray-400">✓ Provably Fair Game</span>
+            </div>
+            <div className="text-xs text-gray-500">Powered by SPRIBE</div>
+          </footer>
         </div>
 
         {/* Right Sidebar - Desktop Only - Scrollable */}
