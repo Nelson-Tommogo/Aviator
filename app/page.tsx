@@ -26,34 +26,25 @@ interface CashoutHistory {
   multiplier: number
   winAmount: number
   timestamp: Date
+  timeAgo: string
 }
-
-// Currency conversion rate (1 USD = 150 KSH)
-const USD_TO_KSH_RATE = 150
 
 export default function JetWinAviator() {
   const [gameState, setGameState] = useState<"waiting" | "flying" | "crashed">("waiting")
   const [multiplier, setMultiplier] = useState(1.0)
-  const [betAmount1, setBetAmount1] = useState(0.07) // $0.07 = 10 KSH
-  const [betAmount2, setBetAmount2] = useState(0.07)
-  const [autoCashout1, setAutoCashout1] = useState(1.1)
-  const [autoCashout2, setAutoCashout2] = useState(1.1)
-  const [balance, setBalance] = useState(0.004) // $0.004 = 0.6 KSH
+  const [betAmount, setBetAmount] = useState(10.5) // $10.50
+  const [autoCashout, setAutoCashout] = useState(1.1)
+  const [balance, setBalance] = useState(50.75) // $50.75
   const [allBets, setAllBets] = useState<Bet[]>([])
   const [previousBets, setPreviousBets] = useState<Bet[]>([])
   const [topBets, setTopBets] = useState<Bet[]>([])
   const [cashoutHistory, setCashoutHistory] = useState<CashoutHistory[]>([])
-  const [bet1Active, setBet1Active] = useState(false)
-  const [bet2Active, setBet2Active] = useState(false)
-  const [bet1Cashed, setBet1Cashed] = useState(false)
-  const [bet2Cashed, setBet2Cashed] = useState(false)
+  const [betActive, setBetActive] = useState(false)
+  const [betCashed, setBetCashed] = useState(false)
   const [activeTab, setActiveTab] = useState("All Bets")
-  const [autoBet1, setAutoBet1] = useState(false)
-  const [autoBet2, setAutoBet2] = useState(false)
-  const [autoCash1, setAutoCash1] = useState(false)
-  const [autoCash2, setAutoCash2] = useState(false)
-  const [betMode1, setBetMode1] = useState<"bet" | "auto">("bet")
-  const [betMode2, setBetMode2] = useState<"bet" | "auto">("bet")
+  const [autoBet, setAutoBet] = useState(false)
+  const [autoCash, setAutoCash] = useState(false)
+  const [betMode, setBetMode] = useState<"bet" | "auto">("bet")
   const [showRules, setShowRules] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [userEmail, setUserEmail] = useState("")
@@ -78,6 +69,28 @@ export default function JetWinAviator() {
     return `${firstDigit}****${lastDigit}`
   }
 
+  // Generate time ago string
+  const generateTimeAgo = () => {
+    const timeOptions = [
+      "1 min ago",
+      "2 mins ago",
+      "3 mins ago",
+      "4 mins ago",
+      "5 mins ago",
+      "6 mins ago",
+      "7 mins ago",
+      "8 mins ago",
+      "9 mins ago",
+      "10 mins ago",
+      "15 mins ago",
+      "20 mins ago",
+      "30 mins ago",
+      "45 mins ago",
+      "1 hour ago",
+    ]
+    return timeOptions[Math.floor(Math.random() * timeOptions.length)]
+  }
+
   // Initialize audio with better web compatibility
   const initializeAudio = useCallback(async () => {
     if (!audioInitialized) {
@@ -86,7 +99,6 @@ export default function JetWinAviator() {
           audioRef.current.volume = 0.3
           audioRef.current.muted = false
           audioRef.current.loop = true
-          // Create a user gesture to unlock audio
           const playPromise = audioRef.current.play()
           if (playPromise !== undefined) {
             await playPromise
@@ -102,7 +114,6 @@ export default function JetWinAviator() {
         console.log("Audio initialized successfully")
       } catch (error) {
         console.log("Audio initialization failed:", error)
-        // Retry after user interaction
         setTimeout(() => {
           if (!audioInitialized) {
             initializeAudio()
@@ -149,7 +160,6 @@ export default function JetWinAviator() {
       document.addEventListener(event, handleUserInteraction, { once: true })
     })
 
-    // Auto-initialize after a delay
     setTimeout(initializeAudio, 2000)
 
     return () => {
@@ -171,14 +181,11 @@ export default function JetWinAviator() {
     localStorage.setItem("jetcash-music-enabled", JSON.stringify(musicEnabled))
   }, [musicEnabled])
 
-  // Currency conversion functions
-  const usdToKsh = (usd: number) => usd * USD_TO_KSH_RATE
-  const kshToUsd = (ksh: number) => ksh / USD_TO_KSH_RATE
-
   // Generate dynamic bet amount
   const generateDynamicBetAmount = () => {
     const amounts = [
-      5, 10, 15, 20, 25, 50, 75, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 5000, 7500, 10000, 15000, 20000,
+      5.5, 10.25, 15.75, 20.0, 25.5, 50.0, 75.25, 100.0, 150.5, 200.75, 300.0, 500.25, 750.5, 1000.0, 1500.75, 2000.0,
+      3000.5, 5000.0, 7500.25, 10000.0,
     ]
     return amounts[Math.floor(Math.random() * amounts.length)]
   }
@@ -190,7 +197,7 @@ export default function JetWinAviator() {
 
     for (let i = 0; i < 10000; i++) {
       const player = generatePlayerName()
-      const amount = kshToUsd(generateDynamicBetAmount())
+      const amount = generateDynamicBetAmount()
       const multiplier = Math.random() * 100 + 1
       const status = Math.random() > 0.4 ? "win" : "loss"
       const winAmount = status === "win" ? amount * multiplier : 0
@@ -206,7 +213,7 @@ export default function JetWinAviator() {
       })
     }
 
-    // Generate cashout history (only wins)
+    // Generate cashout history using recent multipliers
     const avatars = [
       "🎮",
       "🚀",
@@ -240,11 +247,15 @@ export default function JetWinAviator() {
       "☀️",
     ]
 
+    // Use recent multipliers for realistic cashout history
+    const recentMultipliers = [2.01, 1.01, 1.28, 2.72, 1.27, 1.41, 2.74, 1.05, 1.52, 7.35, 1.84, 2.21, 2.83, 4.32, 1.23]
+
     for (let i = 0; i < 1000; i++) {
       const player = generatePlayerName()
       const avatar = avatars[Math.floor(Math.random() * avatars.length)]
-      const amount = kshToUsd(generateDynamicBetAmount())
-      const multiplier = Math.random() * 50 + 1.1
+      const amount = generateDynamicBetAmount()
+      // Use recent multipliers for more realistic history
+      const multiplier = i < recentMultipliers.length ? recentMultipliers[i] : Math.random() * 50 + 1.1
       const winAmount = amount * multiplier
 
       cashouts.push({
@@ -254,7 +265,8 @@ export default function JetWinAviator() {
         amount,
         multiplier: Number(multiplier.toFixed(2)),
         winAmount: Number(winAmount.toFixed(2)),
-        timestamp: new Date(Date.now() - Math.random() * 86400000),
+        timestamp: new Date(Date.now() - Math.random() * 3600000), // Within last hour
+        timeAgo: generateTimeAgo(),
       })
     }
 
@@ -271,7 +283,7 @@ export default function JetWinAviator() {
       const updated = [...prev]
       for (let i = 0; i < 10; i++) {
         const randomIndex = Math.floor(Math.random() * updated.length)
-        const amount = kshToUsd(generateDynamicBetAmount())
+        const amount = generateDynamicBetAmount()
         const multiplier = Math.random() * 100 + 1
         const status = Math.random() > 0.4 ? "win" : "loss"
         const winAmount = status === "win" ? amount * multiplier : 0
@@ -289,57 +301,52 @@ export default function JetWinAviator() {
       return updated
     })
 
-    // Update cashout history
+    // Update cashout history with recent multipliers
     setCashoutHistory((prev) => {
       const updated = [...prev]
+      const recentMultiplier = previousMultipliers[Math.floor(Math.random() * Math.min(5, previousMultipliers.length))]
       const newCashout = {
         id: `cashout-${Date.now()}`,
         player: generatePlayerName(),
         avatar: ["🎮", "🚀", "⭐", "🔥", "💎", "🎯", "⚡", "🌟", "🎲", "🏆"][Math.floor(Math.random() * 10)],
-        amount: kshToUsd(generateDynamicBetAmount()),
-        multiplier: Number((Math.random() * 50 + 1.1).toFixed(2)),
+        amount: generateDynamicBetAmount(),
+        multiplier: recentMultiplier || Number((Math.random() * 50 + 1.1).toFixed(2)),
         winAmount: 0,
         timestamp: new Date(),
+        timeAgo: generateTimeAgo(),
       }
       newCashout.winAmount = newCashout.amount * newCashout.multiplier
 
       return [newCashout, ...updated.slice(0, 999)]
     })
-  }, [])
+  }, [previousMultipliers])
 
   // Generate realistic crash point (Betika-like behavior)
   const generateCrashPoint = useCallback(() => {
     if (isAdmin) {
-      // Admin mode - fair gameplay
       const rand = Math.random()
-      if (rand < 0.4) return 1.1 + Math.random() * 2.0 // 40% chance: 1.1x - 3.1x
-      if (rand < 0.7) return 2.0 + Math.random() * 8.0 // 30% chance: 2.0x - 10.0x
-      if (rand < 0.9) return 10.0 + Math.random() * 90.0 // 20% chance: 10.0x - 100.0x
-      return 100.0 + Math.random() * 900.0 // 10% chance: 100.0x - 1000.0x
+      if (rand < 0.4) return 1.1 + Math.random() * 2.0
+      if (rand < 0.7) return 2.0 + Math.random() * 8.0
+      if (rand < 0.9) return 10.0 + Math.random() * 90.0
+      return 100.0 + Math.random() * 900.0
     }
 
-    // Realistic Betika-like distribution
+    // More unpredictable distribution
     const rand = Math.random()
 
-    if (rand < 0.6) {
-      // 60% chance: crash between 1.00x - 2.00x (most common)
-      return 1.0 + Math.random() * 1.0
-    } else if (rand < 0.85) {
-      // 25% chance: crash between 2.00x - 10.00x
-      return 2.0 + Math.random() * 8.0
-    } else if (rand < 0.96) {
-      // 11% chance: crash between 10.00x - 100.00x
-      return 10.0 + Math.random() * 90.0
+    if (rand < 0.5) {
+      return 1.0 + Math.random() * 1.5 // 50% chance: 1.00x - 2.50x
+    } else if (rand < 0.75) {
+      return 2.5 + Math.random() * 7.5 // 25% chance: 2.50x - 10.00x
+    } else if (rand < 0.92) {
+      return 10.0 + Math.random() * 90.0 // 17% chance: 10.00x - 100.00x
     } else {
-      // 4% chance: crash between 100.00x - 1000.00x (rare moon shots)
-      return 100.0 + Math.random() * 900.0
+      return 100.0 + Math.random() * 900.0 // 8% chance: 100.00x - 1000.00x
     }
   }, [isAdmin])
 
   useEffect(() => {
     generateDummyData()
-
-    // Start dynamic data updates
     dataUpdateIntervalRef.current = setInterval(updateDynamicData, 3000)
 
     return () => {
@@ -359,13 +366,11 @@ export default function JetWinAviator() {
     if (audioRef.current) {
       try {
         if (!musicEnabled) {
-          // Enabling music
           if (gameState === "flying") {
             audioRef.current.currentTime = 0
             await audioRef.current.play()
           }
         } else {
-          // Disabling music
           audioRef.current.pause()
         }
       } catch (error) {
@@ -388,7 +393,6 @@ export default function JetWinAviator() {
   }
 
   const playCrashSound = async () => {
-    // Stop takeoff sound first
     if (audioRef.current) {
       audioRef.current.pause()
     }
@@ -411,31 +415,27 @@ export default function JetWinAviator() {
     manualCashoutRef.current = false
     setGameState("flying")
     setMultiplier(1.0)
-    setBet1Cashed(false)
-    setBet2Cashed(false)
+    setBetCashed(false)
 
     playTakeoffSound()
 
     let currentMultiplier = 1.0
-    // Variable speed based on crash point for more realistic feel
-    const baseSpeed = crashPointRef.current > 10 ? 0.8 : crashPointRef.current > 2 ? 1.0 : 1.2
+    // More unpredictable speed variations
+    const speedVariations = [0.6, 0.8, 1.0, 1.2, 1.5, 1.8]
+    const baseSpeed = speedVariations[Math.floor(Math.random() * speedVariations.length)]
 
     gameIntervalRef.current = setInterval(() => {
-      const increment = (0.01 + currentMultiplier * 0.001) * baseSpeed
+      // Add random speed fluctuations during flight
+      const speedFluctuation = 0.8 + Math.random() * 0.4 // 0.8 to 1.2
+      const increment = (0.01 + currentMultiplier * 0.001) * baseSpeed * speedFluctuation
       currentMultiplier += increment
       setMultiplier(currentMultiplier)
 
       // Admin mode - allow normal cashouts
       if (isAdmin) {
-        if (autoCash1 && bet1Active && !bet1Cashed && currentMultiplier >= autoCashout1) {
-          setBet1Cashed(true)
-          const winAmount = betAmount1 * autoCashout1
-          setBalance((prev) => prev + winAmount)
-        }
-
-        if (autoCash2 && bet2Active && !bet2Cashed && currentMultiplier >= autoCashout2) {
-          setBet2Cashed(true)
-          const winAmount = betAmount2 * autoCashout2
+        if (autoCash && betActive && !betCashed && currentMultiplier >= autoCashout) {
+          setBetCashed(true)
+          const winAmount = betAmount * autoCashout
           setBalance((prev) => prev + winAmount)
         }
       }
@@ -453,37 +453,16 @@ export default function JetWinAviator() {
 
         setTimeout(() => {
           setGameState("waiting")
-          setBet1Active(false)
-          setBet2Active(false)
-          setBet1Cashed(false)
-          setBet2Cashed(false)
+          setBetActive(false)
+          setBetCashed(false)
 
-          if (autoBet1) {
-            setTimeout(() => placeBet(1), 1000)
-          }
-          if (autoBet2) {
-            setTimeout(() => placeBet(2), 1000)
+          if (autoBet) {
+            setTimeout(() => placeBet(), 1000)
           }
         }, 3000)
       }
     }, 50)
-  }, [
-    gameState,
-    generateCrashPoint,
-    autoCash1,
-    autoCash2,
-    autoCashout1,
-    autoCashout2,
-    bet1Active,
-    bet2Active,
-    bet1Cashed,
-    bet2Cashed,
-    betAmount1,
-    betAmount2,
-    autoBet1,
-    autoBet2,
-    isAdmin,
-  ])
+  }, [gameState, generateCrashPoint, autoCash, autoCashout, betActive, betCashed, betAmount, autoBet, isAdmin])
 
   useEffect(() => {
     if (gameState === "waiting") {
@@ -492,52 +471,37 @@ export default function JetWinAviator() {
           startGame()
         },
         Math.random() * 3000 + 2000,
-      ) // Random wait time between 2-5 seconds
+      )
       return () => clearTimeout(timer)
     }
   }, [gameState, startGame])
 
-  const placeBet = (betNumber: 1 | 2) => {
-    if (gameState !== "waiting") return; // Only allow placing bet before plane starts
+  const placeBet = () => {
+    if (gameState !== "waiting") return
+    if (betAmount > balance) return
 
-    const amount = betNumber === 1 ? betAmount1 : betAmount2;
-    if (amount > balance) return; // Not enough balance
-
-    if (betNumber === 1) {
-      setBet1Active(true);
-      setBet1Cashed(false);
-    } else {
-      setBet2Active(true);
-      setBet2Cashed(false);
-    }
-
-    setBalance((prev) => prev - amount);
+    setBetActive(true)
+    setBetCashed(false)
+    setBalance((prev) => prev - betAmount)
   }
 
-  const cashOut = (betNumber: 1 | 2) => {
+  const cashOut = () => {
     if (gameState !== "flying") return
-    if ((betNumber === 1 && bet1Cashed) || (betNumber === 2 && bet2Cashed)) return
+    if (betCashed) return
 
     if (isAdmin) {
-      // Admin mode - allow successful cashout
-      if (betNumber === 1 && bet1Active) {
-        setBet1Cashed(true)
-        const winAmount = betAmount1 * multiplier
-        setBalance((prev) => prev + winAmount)
-      }
-      if (betNumber === 2 && bet2Active) {
-        setBet2Cashed(true)
-        const winAmount = betAmount2 * multiplier
+      if (betActive) {
+        setBetCashed(true)
+        const winAmount = betAmount * multiplier
         setBalance((prev) => prev + winAmount)
       }
     } else {
-      // Regular mode - crash immediately on cashout attempt
       setTimeout(
         () => {
           manualCashoutRef.current = true
         },
         Math.random() * 50 + 10,
-      ) // Random delay 10-60ms
+      )
     }
   }
 
@@ -560,88 +524,53 @@ export default function JetWinAviator() {
     return "bg-red-600 text-white border-red-500"
   }
 
-  // --- Exponential Graph Logic ---
-  // Parameters for the graph
-  const graphSteps = 100
-  const graphStartX = 5
-  const graphStartY = 95
-  const graphWidth = 85
-  const graphHeight = 80
-  const expBase = 1.045 // Controls curve steepness (tweak for realism)
+  // Unpredictable plane movement with random variations
+  const getUnpredictablePlanePosition = () => {
+    if (gameState !== "flying") return { left: "5%", bottom: "5%", transform: "rotate(15deg)" }
 
-  // Generate graph points for the curve up to the current multiplier
-  const getGraphPointsToCurrent = () => {
-    const points = []
-    const maxMultiplier = 20
-    // Find t for current multiplier
-    let tCurrent = 0
-    for (let i = 0; i <= graphSteps; i++) {
-      const t = i / graphSteps
-      const multiplierVal = 1 + (maxMultiplier - 1) * (1 - Math.exp(-3 * t))
-      if (multiplierVal >= multiplier) {
-        tCurrent = t
-        break
-      }
-    }
-    for (let i = 0; i <= graphSteps * tCurrent; i++) {
-      const t = i / graphSteps
-      const multiplierVal = 1 + (maxMultiplier - 1) * (1 - Math.exp(-3 * t))
-      const x = graphStartX + t * graphWidth
-      const y = graphStartY - ((multiplierVal - 1) / (maxMultiplier - 1)) * graphHeight
-      points.push({ x, y })
-    }
-    return points
-  }
+    // Base position calculation
+    const baseLeft = Math.min(90, 5 + (multiplier - 1) * 8)
+    const baseBottom = Math.min(85, 5 + (multiplier - 1) * 6)
 
-  // SVG path for the graph up to the current multiplier
-  const getGraphPath = () => {
-    const points = getGraphPointsToCurrent()
-    if (points.length === 0) return ""
-    let d = `M ${points[0].x}% ${points[0].y}%`
-    for (let i = 1; i < points.length; i++) {
-      d += ` L ${points[i].x}% ${points[i].y}%`
-    }
-    return d
-  }
+    // Add unpredictable variations
+    const leftVariation = Math.sin(multiplier * 2) * 5 // Oscillating movement
+    const bottomVariation = Math.cos(multiplier * 1.5) * 3 + Math.random() * 2 - 1 // Random up/down
 
-  // SVG path for the area fill under the curve (from start, along curve, then vertical down, then back to start)
-  const getGraphAreaPath = () => {
-    const points = getGraphPointsToCurrent()
-    if (points.length === 0) return ""
-    let d = `M ${points[0].x}% ${points[0].y}%`
-    for (let i = 1; i < points.length; i++) {
-      d += ` L ${points[i].x}% ${points[i].y}%`
-    }
-    // Vertical line from plane down to bottom
-    d += ` L ${points[points.length - 1].x}% 100%`
-    // Line back to start along the bottom
-    d += ` L ${points[0].x}% 100% Z`
-    return d
-  }
+    // Sometimes make dramatic movements
+    const dramaticMove = Math.random() < 0.1 ? (Math.random() - 0.5) * 10 : 0
 
-  // Plane position along the graph
-  const getPlaneGraphPosition = () => {
-    const points = getGraphPointsToCurrent()
-    const idx = points.length - 1
-    if (points.length === 0) return { left: "5%", bottom: "5%", transform: "rotate(-15deg)" }
-    const pt = points[idx]
-    // Calculate angle for plane tilt
-    let angle = 0
-    if (idx > 0) {
-      const prev = points[idx - 1]
-      angle = Math.atan2(pt.y - prev.y, pt.x - prev.x) * (45 / Math.PI)
-    }
+    const finalLeft = Math.max(5, Math.min(90, baseLeft + leftVariation + dramaticMove))
+    const finalBottom = Math.max(5, Math.min(85, baseBottom + bottomVariation))
+
+    // Dynamic rotation based on movement
+    const rotation = 15 + Math.sin(multiplier) * 10 + (Math.random() - 0.5) * 5
+
     return {
-      left: `${pt.x}%`,
-      bottom: `${100 - pt.y}%`,
-      transform: `rotate(${angle}deg)`,
+      left: `${finalLeft}%`,
+      bottom: `${finalBottom}%`,
+      transform: `rotate(${rotation}deg)`,
     }
   }
 
-  // Use the graph-based plane position
-  const planePosition = getPlaneGraphPosition()
+  const planePosition = getUnpredictablePlanePosition()
 
-  // Play WhatsApp audio on mount and on user interaction if needed
+  // Calculate trajectory path for unpredictable movement
+  const getTrajectoryPath = () => {
+    if (gameState !== "flying") return ""
+
+    const leftPercent = Number.parseFloat(planePosition.left)
+    const bottomPercent = Number.parseFloat(planePosition.bottom)
+
+    // Create a more dynamic path with curves
+    const midX = leftPercent / 2
+    const midY = 95 - bottomPercent / 2
+    const controlX = midX + Math.sin(multiplier) * 10
+    const controlY = midY + Math.cos(multiplier) * 5
+
+    return `M 0 95 Q ${controlX} ${controlY} ${leftPercent} ${95 - bottomPercent}`
+  }
+
+  // Play WhatsApp audio on mount
   useEffect(() => {
     const playLoopAudio = async () => {
       try {
@@ -668,7 +597,7 @@ export default function JetWinAviator() {
     }
   }
 
-  // Play flew sound when the plane flies away (crashed)
+  // Play flew sound when crashed
   useEffect(() => {
     if (gameState === "crashed" && flewAudioRef.current) {
       flewAudioRef.current.currentTime = 0
@@ -702,9 +631,7 @@ export default function JetWinAviator() {
             <div className="text-xl font-bold text-red-400">Aviator</div>
           </div>
           <div className="flex items-center space-x-4">
-            <div className="text-green-400 font-bold text-sm">
-              ${balance.toFixed(3)} ({usdToKsh(balance).toFixed(2)} KES)
-            </div>
+            <div className="text-green-400 font-bold text-sm">${balance.toFixed(2)}</div>
             <div className="flex items-center space-x-2">
               <Button size="sm" variant="ghost" onClick={toggleMusic} className="p-1">
                 {musicEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
@@ -747,9 +674,7 @@ export default function JetWinAviator() {
           </nav>
 
           <div className="flex items-center space-x-4">
-            <div className="text-green-400 font-bold">
-              ${balance.toFixed(3)} ({usdToKsh(balance).toFixed(2)} KES)
-            </div>
+            <div className="text-green-400 font-bold">${balance.toFixed(2)}</div>
             <Button size="sm" variant="ghost" onClick={toggleMusic}>
               {musicEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
             </Button>
@@ -788,7 +713,7 @@ export default function JetWinAviator() {
                   activeTab === "Previous" ? "bg-gray-700 text-white" : "bg-transparent border-gray-600 text-gray-400"
                 }
               >
-                Top
+                Previous
               </Button>
               <Button
                 variant={activeTab === "Top" ? "default" : "outline"}
@@ -810,9 +735,9 @@ export default function JetWinAviator() {
             <div className="space-y-2">
               <div className="grid grid-cols-4 text-xs text-gray-400 mb-2 sticky top-0 bg-gray-800 py-2 z-10">
                 <span>Player</span>
-                <span>Bet KES</span>
+                <span>Bet $</span>
                 <span>X</span>
-                <span>Win KES</span>
+                <span>Win $</span>
               </div>
 
               {getCurrentBets()
@@ -825,12 +750,12 @@ export default function JetWinAviator() {
                       </div>
                       <span className="truncate">{bet.player}</span>
                     </div>
-                    <span className="text-xs">{usdToKsh(bet.amount).toFixed(0)}</span>
+                    <span className="text-xs">${bet.amount.toFixed(0)}</span>
                     <span className={bet.status === "win" ? "text-green-400" : "text-red-400"}>
                       {bet.status === "win" ? `${bet.multiplier.toFixed(2)}x` : "-"}
                     </span>
                     <span className={bet.status === "win" ? "text-green-400" : "text-red-400"}>
-                      {bet.status === "win" ? usdToKsh(bet.winAmount).toFixed(0) : "0"}
+                      {bet.status === "win" ? `$${bet.winAmount.toFixed(0)}` : "$0"}
                     </span>
                   </div>
                 ))}
@@ -838,7 +763,7 @@ export default function JetWinAviator() {
           </div>
         </div>
 
-        {/* Main Game Area - Fixed at bottom */}
+        {/* Main Game Area */}
         <div className="flex-1 min-w-0 flex flex-col h-full">
           {/* Previous Multipliers */}
           <div className="bg-gray-800 p-2 md:p-4 border-b border-gray-700 flex-shrink-0">
@@ -868,47 +793,47 @@ export default function JetWinAviator() {
               animation: gameState === "flying" ? "moveBackground 3s linear infinite" : "none",
             }}
           >
-            {/* Graph Line Attached to Plane */}
+            {/* Unpredictable Trajectory Line */}
             {gameState === "flying" && (
               <>
-                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{zIndex: 10}}>
+                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 10 }}>
                   <defs>
-                    <linearGradient id="graphGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <linearGradient id="trajectoryGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                       <stop offset="0%" stopColor="#ef4444" stopOpacity="0.8" />
                       <stop offset="50%" stopColor="#ef4444" stopOpacity="0.6" />
                       <stop offset="100%" stopColor="#ef4444" stopOpacity="0.3" />
                     </linearGradient>
-                    <filter id="graphGlow">
-                      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-                      <feMerge> 
-                        <feMergeNode in="coloredBlur"/>
-                        <feMergeNode in="SourceGraphic"/>
+                    <filter id="trajectoryGlow">
+                      <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+                      <feMerge>
+                        <feMergeNode in="coloredBlur" />
+                        <feMergeNode in="SourceGraphic" />
                       </feMerge>
                     </filter>
                   </defs>
 
-                  {/* Solid graph line attached to plane */}
-                  <path 
-                    d={getGraphPath()} 
-                    stroke="#ef4444" 
-                    strokeWidth="4" 
-                    fill="none" 
+                  {/* Dynamic trajectory line */}
+                  <path
+                    d={getTrajectoryPath()}
+                    stroke="#ef4444"
+                    strokeWidth="4"
+                    fill="none"
                     strokeLinecap="round"
-                    filter="url(#graphGlow)"
+                    filter="url(#trajectoryGlow)"
                     opacity="0.95"
                   />
 
                   {/* Area fill under the curve */}
                   <path
-                    d={getGraphAreaPath()}
-                    fill="url(#graphGradient)"
+                    d={`${getTrajectoryPath()} L ${planePosition.left} 100 L 0 100 Z`}
+                    fill="url(#trajectoryGradient)"
                     opacity="0.13"
                   />
                 </svg>
               </>
             )}
 
-            {/* Plane with enhanced styling */}
+            {/* Lighter, Faster Plane */}
             <div
               className="absolute transition-all duration-75 transform"
               style={{
@@ -918,16 +843,19 @@ export default function JetWinAviator() {
                 filter: gameState === "flying" ? "drop-shadow(0 0 10px rgba(255,255,255,0.3))" : "none",
               }}
             >
-              <img
-                src="/plane.svg"
-                alt="Plane"
-                className="w-16 h-16 md:w-24 md:h-24"
-                style={{ 
-                  filter: gameState === "flying" ? "brightness(1.3) drop-shadow(0 0 5px rgba(255,255,255,0.5))" : "brightness(1.2)",
-                  animation: gameState === "flying" ? "planeGlow 1s ease-in-out infinite alternate" : "none",
-                  transform: "scaleX(1.2) scaleY(1.1)",
+              {/* Lighter plane icon using emoji */}
+              <div
+                className="text-4xl md:text-6xl"
+                style={{
+                  filter:
+                    gameState === "flying"
+                      ? "brightness(1.3) drop-shadow(0 0 5px rgba(255,255,255,0.5))"
+                      : "brightness(1.2)",
+                  animation: gameState === "flying" ? "planeGlow 0.5s ease-in-out infinite alternate" : "none",
                 }}
-              />
+              >
+                ✈️
+              </div>
             </div>
 
             {/* Multiplier Display */}
@@ -944,10 +872,13 @@ export default function JetWinAviator() {
                   </div>
                 </div>
               ) : gameState === "flying" ? (
-                <div className="text-6xl md:text-8xl font-bold text-white drop-shadow-lg" style={{
-                  textShadow: "0 0 20px rgba(255,255,255,0.5)",
-                  animation: "multiplierPulse 0.5s ease-in-out infinite alternate"
-                }}>
+                <div
+                  className="text-6xl md:text-8xl font-bold text-white drop-shadow-lg"
+                  style={{
+                    textShadow: "0 0 20px rgba(255,255,255,0.5)",
+                    animation: "multiplierPulse 0.5s ease-in-out infinite alternate",
+                  }}
+                >
                   {multiplier.toFixed(2)}x
                 </div>
               ) : (
@@ -956,19 +887,18 @@ export default function JetWinAviator() {
             </div>
           </div>
 
-          {/* Betting Panel - Fixed at bottom */}
+          {/* Single Betting Panel */}
           <div className="bg-gray-800 p-4 md:p-6 flex-shrink-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-              {/* Bet 1 */}
+            <div className="max-w-md mx-auto">
               <div className="bg-gray-700 border border-gray-600 p-4 rounded-lg">
                 <div className="flex justify-center mb-4">
                   <div className="flex bg-gray-600 rounded-lg p-1">
                     <Button
-                      variant={betMode1 === "bet" ? "default" : "ghost"}
+                      variant={betMode === "bet" ? "default" : "ghost"}
                       size="sm"
-                      onClick={() => setBetMode1("bet")}
+                      onClick={() => setBetMode("bet")}
                       className={
-                        betMode1 === "bet"
+                        betMode === "bet"
                           ? "px-8 bg-green-600 hover:bg-green-700 text-white"
                           : "px-8 bg-green-100 text-green-700 hover:bg-green-200"
                       }
@@ -976,11 +906,11 @@ export default function JetWinAviator() {
                       Bet
                     </Button>
                     <Button
-                      variant={betMode1 === "auto" ? "default" : "ghost"}
+                      variant={betMode === "auto" ? "default" : "ghost"}
                       size="sm"
-                      onClick={() => setBetMode1("auto")}
+                      onClick={() => setBetMode("auto")}
                       className={
-                        betMode1 === "auto"
+                        betMode === "auto"
                           ? "px-8 bg-green-600 hover:bg-green-700 text-white"
                           : "px-8 bg-green-100 text-green-700 hover:bg-green-200"
                       }
@@ -994,23 +924,23 @@ export default function JetWinAviator() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setBetAmount1(Math.max(0.01, betAmount1 - 0.01))}
+                    onClick={() => setBetAmount(Math.max(1, betAmount - 1))}
                     className="bg-gray-600 border-gray-500 text-white w-10 h-10 rounded-full"
                   >
                     -
                   </Button>
                   <Input
                     type="number"
-                    value={betAmount1.toFixed(2)}
-                    onChange={(e) => setBetAmount1(Math.max(0.01, Number.parseFloat(e.target.value) || 0.01))}
+                    value={betAmount.toFixed(2)}
+                    onChange={(e) => setBetAmount(Math.max(1, Number.parseFloat(e.target.value) || 1))}
                     className="text-2xl font-bold text-white min-w-[120px] text-center bg-gray-600 border-gray-500"
                     step="0.01"
-                    min="0.01"
+                    min="1"
                   />
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setBetAmount1(betAmount1 + 0.01)}
+                    onClick={() => setBetAmount(betAmount + 1)}
                     className="bg-gray-600 border-gray-500 text-white w-10 h-10 rounded-full"
                   >
                     +
@@ -1018,44 +948,44 @@ export default function JetWinAviator() {
                 </div>
 
                 <div className="grid grid-cols-4 gap-2 mb-4">
-                  {[100, 200, 500, 20000].map((amount) => (
+                  {[10, 25, 50, 100].map((amount) => (
                     <Button
                       key={amount}
                       variant="outline"
                       size="sm"
-                      onClick={() => setBetAmount1(kshToUsd(amount))}
+                      onClick={() => setBetAmount(amount)}
                       className="bg-gray-600 border-gray-500 text-white text-xs"
                     >
-                      {amount >= 1000 ? `${amount / 1000}k` : amount}
+                      ${amount}
                     </Button>
                   ))}
                 </div>
 
-                {betMode1 === "auto" && (
+                {betMode === "auto" && (
                   <div className="space-y-3 mb-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-400">Auto bet</span>
-                      <Switch checked={autoBet1} onCheckedChange={setAutoBet1} />
+                      <Switch checked={autoBet} onCheckedChange={setAutoBet} />
                     </div>
 
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-400">Auto Cash Out</span>
-                      <Switch checked={autoCash1} onCheckedChange={setAutoCash1} />
+                      <Switch checked={autoCash} onCheckedChange={setAutoCash} />
                     </div>
 
-                    {autoCash1 && (
+                    {autoCash && (
                       <div className="flex items-center space-x-2">
                         <span className="text-sm text-gray-400">At:</span>
                         <Input
                           type="number"
-                          value={autoCashout1}
-                          onChange={(e) => setAutoCashout1(Number.parseFloat(e.target.value) || 1.1)}
+                          value={autoCashout}
+                          onChange={(e) => setAutoCashout(Number.parseFloat(e.target.value) || 1.1)}
                           className="w-20 bg-gray-600 border-gray-500 text-white text-center text-xs"
                           step="0.01"
                           min="1.01"
                         />
                         <span className="text-sm text-gray-400">x</span>
-                        <Button variant="ghost" size="sm" className="text-gray-400" onClick={() => setAutoCash1(false)}>
+                        <Button variant="ghost" size="sm" className="text-gray-400" onClick={() => setAutoCash(false)}>
                           ×
                         </Button>
                       </div>
@@ -1065,179 +995,37 @@ export default function JetWinAviator() {
 
                 {gameState === "waiting" ? (
                   <Button
-                    onClick={() => placeBet(1)}
-                    disabled={bet1Active || betAmount1 > balance}
+                    onClick={placeBet}
+                    disabled={betActive || betAmount > balance}
                     className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-6 text-lg"
                   >
                     Bet
-                    <br />
-                    {usdToKsh(betAmount1).toFixed(2)} KES
+                    <br />${betAmount.toFixed(2)}
                   </Button>
-                ) : bet1Active && !bet1Cashed ? (
+                ) : betActive && !betCashed ? (
                   <Button
-                    onClick={() => cashOut(1)}
+                    onClick={cashOut}
                     className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-6 text-lg"
                   >
                     Cash Out
-                    <br />
-                    {usdToKsh(betAmount1 * multiplier).toFixed(2)} KES
+                    <br />${(betAmount * multiplier).toFixed(2)}
                   </Button>
-                ) : bet1Cashed ? (
+                ) : betCashed ? (
                   <Button disabled className="w-full bg-green-600 text-white py-6 text-lg">
                     Cashed Out
-                    <br />
-                    {usdToKsh(betAmount1 * multiplier).toFixed(2)} KES
+                    <br />${(betAmount * multiplier).toFixed(2)}
                   </Button>
                 ) : (
                   <Button disabled className="w-full bg-gray-600 text-gray-400 py-6 text-lg">
                     Bet
-                    <br />
-                    {usdToKsh(betAmount1).toFixed(2)} KES
-                  </Button>
-                )}
-              </div>
-
-              {/* Bet 2 */}
-              <div className="bg-gray-700 border border-gray-600 p-4 rounded-lg">
-                <div className="flex justify-center mb-4">
-                  <div className="flex bg-gray-600 rounded-lg p-1">
-                    <Button
-                      variant={betMode2 === "bet" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setBetMode2("bet")}
-                      className={
-                        betMode2 === "bet"
-                          ? "px-8 bg-green-600 hover:bg-green-700 text-white"
-                          : "px-8 bg-green-100 text-green-700 hover:bg-green-200"
-                      }
-                    >
-                      Bet
-                    </Button>
-                    <Button
-                      variant={betMode2 === "auto" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setBetMode2("auto")}
-                      className={
-                        betMode2 === "auto"
-                          ? "px-8 bg-green-600 hover:bg-green-700 text-white"
-                          : "px-8 bg-green-100 text-green-700 hover:bg-green-200"
-                      }
-                    >
-                      Auto
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center space-x-4 mb-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setBetAmount2(Math.max(0.01, betAmount2 - 0.01))}
-                    className="bg-gray-600 border-gray-500 text-white w-10 h-10 rounded-full"
-                  >
-                    -
-                  </Button>
-                  <Input
-                    type="number"
-                    value={betAmount2.toFixed(2)}
-                    onChange={(e) => setBetAmount2(Math.max(0.01, Number.parseFloat(e.target.value) || 0.01))}
-                    className="text-2xl font-bold text-white min-w-[120px] text-center bg-gray-600 border-gray-500"
-                    step="0.01"
-                    min="0.01"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setBetAmount2(betAmount2 + 0.01)}
-                    className="bg-gray-600 border-gray-500 text-white w-10 h-10 rounded-full"
-                  >
-                    +
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-4 gap-2 mb-4">
-                  {[100, 200, 500, 20000].map((amount) => (
-                    <Button
-                      key={amount}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setBetAmount2(kshToUsd(amount))}
-                      className="bg-gray-600 border-gray-500 text-white text-xs"
-                    >
-                      {amount >= 1000 ? `${amount / 1000}k` : amount}
-                    </Button>
-                  ))}
-                </div>
-
-                {betMode2 === "auto" && (
-                  <div className="space-y-3 mb-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">Auto bet</span>
-                      <Switch checked={autoBet2} onCheckedChange={setAutoBet2} />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">Auto Cash Out</span>
-                      <Switch checked={autoCash2} onCheckedChange={setAutoCash2} />
-                    </div>
-
-                    {autoCash2 && (
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-400">At:</span>
-                        <Input
-                          type="number"
-                          value={autoCashout2}
-                          onChange={(e) => setAutoCashout2(Number.parseFloat(e.target.value) || 1.1)}
-                          className="w-20 bg-gray-600 border-gray-500 text-white text-center text-xs"
-                          step="0.01"
-                          min="1.01"
-                        />
-                        <span className="text-sm text-gray-400">x</span>
-                        <Button variant="ghost" size="sm" className="text-gray-400" onClick={() => setAutoCash2(false)}>
-                          ×
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {gameState === "waiting" ? (
-                  <Button
-                    onClick={() => placeBet(2)}
-                    disabled={bet2Active || betAmount2 > balance}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-6 text-lg"
-                  >
-                    Bet
-                    <br />
-                    {usdToKsh(betAmount2).toFixed(2)} KES
-                  </Button>
-                ) : bet2Active && !bet2Cashed ? (
-                  <Button
-                    onClick={() => cashOut(2)}
-                    className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-6 text-lg"
-                  >
-                    Cash Out
-                    <br />
-                    {usdToKsh(betAmount2 * multiplier).toFixed(2)} KES
-                  </Button>
-                ) : bet2Cashed ? (
-                  <Button disabled className="w-full bg-green-600 text-white py-6 text-lg">
-                    Cashed Out
-                    <br />
-                    {usdToKsh(betAmount2 * multiplier).toFixed(2)} KES
-                  </Button>
-                ) : (
-                  <Button disabled className="w-full bg-gray-600 text-gray-400 py-6 text-lg">
-                    Bet
-                    <br />
-                    {usdToKsh(betAmount2).toFixed(2)} KES
+                    <br />${betAmount.toFixed(2)}
                   </Button>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Footer - Fixed at bottom */}
+          {/* Footer */}
           <footer className="bg-gray-800 border-t border-gray-700 p-4 text-center flex-shrink-0">
             <div className="flex items-center justify-center space-x-2 mb-2">
               <span className="text-sm text-gray-400">✓ Provably Fair Game</span>
@@ -1246,7 +1034,7 @@ export default function JetWinAviator() {
           </footer>
         </div>
 
-        {/* Right Sidebar - Desktop Only - Scrollable */}
+        {/* Right Sidebar - Desktop Only */}
         <div className="hidden md:flex w-80 bg-gray-800 border-l border-gray-700 flex-col h-full">
           <div className="p-4 border-b border-gray-700 flex-shrink-0">
             <div className="flex items-center justify-between mb-2">
@@ -1285,12 +1073,6 @@ export default function JetWinAviator() {
                   <p>• Auto Bet: Automatically place bets each round</p>
                   <p>• Auto Cash Out: Automatically cash out at set multiplier</p>
                 </div>
-                <div>
-                  <h4 className="font-semibold text-white mb-2">Payment Methods</h4>
-                  <p>• M-Pesa: Instant deposits and withdrawals</p>
-                  <p>• Visa/Mastercard: Secure card payments</p>
-                  <p>• Bank Transfer: Direct bank deposits</p>
-                </div>
               </div>
             </div>
           ) : (
@@ -1304,14 +1086,12 @@ export default function JetWinAviator() {
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-semibold text-white">{cashout.player}</span>
-                        <span className="text-xs text-gray-400">{cashout.timestamp.toLocaleTimeString()}</span>
+                        <span className="text-xs text-gray-400">{cashout.timeAgo}</span>
                       </div>
-                      <div className="text-xs text-gray-300">Bet: {usdToKsh(cashout.amount).toFixed(0)} KES</div>
+                      <div className="text-xs text-gray-300">Bet: ${cashout.amount.toFixed(0)}</div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-green-400">{cashout.multiplier.toFixed(2)}x</span>
-                        <span className="text-sm font-bold text-yellow-400">
-                          +{usdToKsh(cashout.winAmount).toFixed(0)} KES
-                        </span>
+                        <span className="text-sm font-bold text-yellow-400">+${cashout.winAmount.toFixed(0)}</span>
                       </div>
                     </div>
                   </div>
@@ -1322,9 +1102,11 @@ export default function JetWinAviator() {
         </div>
       </div>
 
-      {/* Mobile Tabs and Bets List - replaced with Cashout History on mobile */}
-      {/** Only show on mobile, hide on md+ */}
-      <div className="md:hidden bg-gray-900 p-4 flex-1 overflow-y-auto" style={{ height: 'calc(100vh - 64px - 200px)' }}>
+      {/* Mobile Cashout History */}
+      <div
+        className="md:hidden bg-gray-900 p-4 flex-1 overflow-y-auto"
+        style={{ height: "calc(100vh - 64px - 200px)" }}
+      >
         <div className="text-sm font-semibold mb-2 text-white">Cashout History</div>
         <div className="text-xs text-gray-400 mb-4">Recent winners and their cashouts</div>
         <div className="space-y-4">
@@ -1336,14 +1118,12 @@ export default function JetWinAviator() {
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-semibold text-white">{cashout.player}</span>
-                  <span className="text-xs text-gray-400">{cashout.timestamp.toLocaleTimeString()}</span>
+                  <span className="text-xs text-gray-400">{cashout.timeAgo}</span>
                 </div>
-                <div className="text-xs text-gray-300 mb-1">Bet: {usdToKsh(cashout.amount).toFixed(0)} KES</div>
+                <div className="text-xs text-gray-300 mb-1">Bet: ${cashout.amount.toFixed(0)}</div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold text-green-400">{cashout.multiplier.toFixed(2)}x</span>
-                  <span className="text-sm font-bold text-yellow-400">
-                    +{usdToKsh(cashout.winAmount).toFixed(0)} KES
-                  </span>
+                  <span className="text-sm font-bold text-yellow-400">+${cashout.winAmount.toFixed(0)}</span>
                 </div>
               </div>
             </div>
@@ -1366,7 +1146,10 @@ export default function JetWinAviator() {
           <div className="bg-gray-900 rounded-lg shadow-lg p-8 flex flex-col items-center">
             <div className="text-2xl font-bold mb-4 text-white">Enable Sound</div>
             <div className="mb-6 text-gray-300">Click below to enable game sounds</div>
-            <Button onClick={handleEnableSound} className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg font-bold rounded">
+            <Button
+              onClick={handleEnableSound}
+              className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg font-bold rounded"
+            >
               Enable Sound
             </Button>
           </div>

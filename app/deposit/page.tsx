@@ -26,7 +26,7 @@ export default function DepositPage() {
     }, 2000)
   }
 
-  const quickAmounts = [100, 500, 1000, 2000, 5000, 10000]
+  const quickAmounts = [10, 25, 50, 100, 250, 500]
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4">
@@ -97,7 +97,7 @@ export default function DepositPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="amount" className="text-white">
-                    Amount (KES)
+                    Amount ($)
                   </Label>
                   <Input
                     id="amount"
@@ -106,7 +106,7 @@ export default function DepositPage() {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     className="bg-gray-700 border-gray-600 text-white"
-                    min="10"
+                    min="1"
                     required
                   />
                 </div>
@@ -123,7 +123,7 @@ export default function DepositPage() {
                         onClick={() => setAmount(quickAmount.toString())}
                         className="bg-gray-700 border-gray-600 text-white"
                       >
-                        {quickAmount >= 1000 ? `${quickAmount / 1000}K` : quickAmount}
+                        ${quickAmount}
                       </Button>
                     ))}
                   </div>
@@ -146,7 +146,7 @@ export default function DepositPage() {
                   disabled={isLoading || !amount || !phoneNumber}
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3"
                 >
-                  {isLoading ? "Sending STK Push..." : `Deposit ${amount} KES`}
+                  {isLoading ? "Sending STK Push..." : `Deposit $${amount}`}
                 </Button>
               </form>
             </CardContent>
@@ -218,14 +218,14 @@ export default function DepositPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="cardAmount" className="text-white">
-                    Amount (KES)
+                    Amount ($)
                   </Label>
                   <Input
                     id="cardAmount"
                     type="number"
                     placeholder="Enter amount"
                     className="bg-gray-700 border-gray-600 text-white"
-                    min="10"
+                    min="1"
                   />
                 </div>
 
@@ -240,7 +240,7 @@ export default function DepositPage() {
                         size="sm"
                         className="bg-gray-700 border-gray-600 text-white"
                       >
-                        {quickAmount >= 1000 ? `${quickAmount / 1000}K` : quickAmount}
+                        ${quickAmount}
                       </Button>
                     ))}
                   </div>
@@ -281,11 +281,11 @@ export default function DepositPage() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-400">Minimum deposit:</span>
-                <span className="text-white">10 KES</span>
+                <span className="text-white">$1</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Maximum deposit:</span>
-                <span className="text-white">300,000 KES</span>
+                <span className="text-white">$10,000</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Processing time:</span>
