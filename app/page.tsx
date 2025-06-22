@@ -60,6 +60,7 @@ export default function JetWinAviator() {
   const [previousMultipliers, setPreviousMultipliers] = useState<number[]>([])
   const [musicEnabled, setMusicEnabled] = useState(true)
   const [audioInitialized, setAudioInitialized] = useState(false)
+  const [showSoundModal, setShowSoundModal] = useState(false)
 
   const audioRef = useRef<HTMLAudioElement>(null)
   const crashAudioRef = useRef<HTMLAudioElement>(null)
@@ -67,6 +68,8 @@ export default function JetWinAviator() {
   const dataUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const crashPointRef = useRef<number>(1.0)
   const manualCashoutRef = useRef<boolean>(false)
+  const welcomeAudioRef = useRef<HTMLAudioElement>(null)
+  const flewAudioRef = useRef<HTMLAudioElement>(null)
 
   // Generate anonymous player name
   const generatePlayerName = () => {
@@ -494,21 +497,21 @@ export default function JetWinAviator() {
     }
   }, [gameState, startGame])
 
-  const placeBet = async (betNumber: 1 | 2) => {
-    if (gameState !== "waiting") return
+  const placeBet = (betNumber: 1 | 2) => {
+    if (gameState !== "waiting") return; // Only allow placing bet before plane starts
 
-    const amount = betNumber === 1 ? betAmount1 : betAmount2
-    if (amount > balance) return
-
-    await initializeAudio()
+    const amount = betNumber === 1 ? betAmount1 : betAmount2;
+    if (amount > balance) return; // Not enough balance
 
     if (betNumber === 1) {
-      setBet1Active(true)
+      setBet1Active(true);
+      setBet1Cashed(false);
     } else {
-      setBet2Active(true)
+      setBet2Active(true);
+      setBet2Cashed(false);
     }
 
-    setBalance((prev) => prev - amount)
+    setBalance((prev) => prev - amount);
   }
 
   const cashOut = (betNumber: 1 | 2) => {
@@ -557,76 +560,116 @@ export default function JetWinAviator() {
     return "bg-red-600 text-white border-red-500"
   }
 
-  // Calculate trajectory path for the graph line
-  const getTrajectoryPath = () => {
-    if (gameState !== "flying") return ""
+  // --- Exponential Graph Logic ---
+  // Parameters for the graph
+  const graphSteps = 100
+  const graphStartX = 5
+  const graphStartY = 95
+  const graphWidth = 85
+  const graphHeight = 80
+  const expBase = 1.045 // Controls curve steepness (tweak for realism)
 
-    const leftPercent = Number.parseFloat(planePosition.left)
-    const bottomPercent = Number.parseFloat(planePosition.bottom)
-
-    // Create a smooth graph line that follows the plane's path
-    const startX = 5
-    const startY = 95
-    const endX = leftPercent
-    const endY = 95 - bottomPercent
-    
-    // Create a smooth curve with multiple control points for a more natural graph
-    const controlX1 = startX + (endX - startX) * 0.25
-    const controlY1 = startY - 15
-    const controlX2 = startX + (endX - startX) * 0.75
-    const controlY2 = startY - bottomPercent * 0.6
-
-    return `M ${startX} ${startY} Q ${controlX1} ${controlY1} ${controlX2} ${controlY2} T ${endX} ${endY}`
-  }
-
-  // Generate graph points for the trail effect
-  const getGraphPoints = () => {
-    if (gameState !== "flying") return []
-    
+  // Generate graph points for the full curve
+  const getFullGraphPoints = () => {
     const points = []
-    const steps = 50
-    const progress = (multiplier - 1) / (crashPointRef.current - 1)
-    
-    for (let i = 0; i <= steps; i++) {
-      const stepProgress = (i / steps) * progress
-      const left = 5 + (stepProgress * 85)
-      const bottom = 5 + (stepProgress * 80)
-      points.push({ x: left, y: 95 - bottom })
+    for (let i = 0; i <= graphSteps; i++) {
+      const t = i / graphSteps
+      // Exponential growth for multiplier
+      const multiplier = Math.pow(expBase, t * 20) // 1.0 to ~multiplier
+      // X grows linearly, Y grows with multiplier
+      const x = graphStartX + t * graphWidth
+      // Map multiplier to graph height (log scale for realism)
+      const y = graphStartY - Math.log(multiplier) / Math.log(expBase) * (graphHeight / 20)
+      points.push({ x, y })
     }
-    
     return points
   }
 
-  // Calculate plane position with more realistic movement
-  const getPlanePosition = () => {
-    if (gameState !== "flying") {
-      return {
-        left: "5%",
-        bottom: "5%",
-        transform: "rotate(-15deg)", // Slight upward tilt when waiting
+  // Get the current progress along the graph (based on multiplier)
+  const getCurrentGraphIndex = () => {
+    // Find the closest point where multiplier matches current
+    let closestIdx = 0
+    let minDiff = Infinity
+    for (let i = 0; i <= graphSteps; i++) {
+      const t = i / graphSteps
+      const m = Math.pow(expBase, t * 20)
+      const diff = Math.abs(m - multiplier)
+      if (diff < minDiff) {
+        minDiff = diff
+        closestIdx = i
       }
     }
+    return closestIdx
+  }
 
-    // More realistic movement calculation
-    const progress = (multiplier - 1) / (crashPointRef.current - 1)
-    const maxLeft = 85
-    const maxBottom = 80
-    
-    // Start from bottom and move diagonally upward
-    const left = 5 + (progress * maxLeft)
-    const bottom = 5 + (progress * maxBottom)
-    
-    // Dynamic rotation - start with slight upward tilt and gradually increase
-    const rotation = -5 - (progress * 20) // Start at -5deg, end at -25deg (natural takeoff angle)
-    
+  // SVG path for the graph up to the current multiplier
+  const getGraphPath = () => {
+    const points = getFullGraphPoints()
+    const idx = getCurrentGraphIndex()
+    if (points.length === 0) return ""
+    let d = `M ${points[0].x}% ${points[0].y}%`
+    for (let i = 1; i <= idx; i++) {
+      d += ` L ${points[i].x}% ${points[i].y}%`
+    }
+    return d
+  }
+
+  // Plane position along the graph
+  const getPlaneGraphPosition = () => {
+    const points = getFullGraphPoints()
+    const idx = getCurrentGraphIndex()
+    if (points.length === 0) return { left: "5%", bottom: "5%", transform: "rotate(-15deg)" }
+    const pt = points[idx]
+    // Calculate angle for plane tilt
+    let angle = 0
+    if (idx > 0) {
+      const prev = points[idx - 1]
+      angle = Math.atan2(pt.y - prev.y, pt.x - prev.x) * (45 / Math.PI)
+    }
     return {
-      left: `${left}%`,
-      bottom: `${bottom}%`,
-      transform: `rotate(${rotation}deg)`,
+      left: `${pt.x}%`,
+      bottom: `${100 - pt.y}%`,
+      transform: `rotate(${angle}deg)`,
     }
   }
 
-  const planePosition = getPlanePosition()
+  // Use the graph-based plane position
+  const planePosition = getPlaneGraphPosition()
+
+  // Play WhatsApp audio on mount and on user interaction if needed
+  useEffect(() => {
+    const playLoopAudio = async () => {
+      try {
+        if (welcomeAudioRef.current) {
+          welcomeAudioRef.current.volume = 0.7
+          welcomeAudioRef.current.muted = false
+          await welcomeAudioRef.current.play()
+          setShowSoundModal(false)
+        }
+      } catch (error) {
+        setShowSoundModal(true)
+      }
+    }
+    playLoopAudio()
+  }, [])
+
+  const handleEnableSound = async () => {
+    if (welcomeAudioRef.current) {
+      try {
+        welcomeAudioRef.current.muted = false
+        await welcomeAudioRef.current.play()
+        setShowSoundModal(false)
+      } catch {}
+    }
+  }
+
+  // Play flew sound when the plane flies away (crashed)
+  useEffect(() => {
+    if (gameState === "crashed" && flewAudioRef.current) {
+      flewAudioRef.current.currentTime = 0
+      flewAudioRef.current.play()
+    }
+  }, [gameState])
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
@@ -636,6 +679,14 @@ export default function JetWinAviator() {
 
       <audio ref={crashAudioRef} preload="auto" playsInline>
         <source src="/sounds/crash-sound.mp3" type="audio/mpeg" />
+      </audio>
+
+      <audio ref={welcomeAudioRef} preload="auto" playsInline loop>
+        <source src="/audio.mp3" type="audio/mpeg" />
+      </audio>
+
+      <audio ref={flewAudioRef} preload="auto" playsInline>
+        <source src="/flew.mp3" type="audio/mpeg" />
       </audio>
 
       {/* Mobile Header */}
@@ -812,7 +863,7 @@ export default function JetWinAviator() {
               animation: gameState === "flying" ? "moveBackground 3s linear infinite" : "none",
             }}
           >
-            {/* Graph Trail and Line */}
+            {/* Graph Line Attached to Plane */}
             {gameState === "flying" && (
               <>
                 <svg className="absolute inset-0 w-full h-full pointer-events-none">
@@ -831,32 +882,20 @@ export default function JetWinAviator() {
                     </filter>
                   </defs>
 
-                  {/* Graph line with trail effect */}
+                  {/* Solid graph line attached to plane */}
                   <path 
-                    d={getTrajectoryPath()} 
+                    d={getGraphPath()} 
                     stroke="#ef4444" 
-                    strokeWidth="3" 
+                    strokeWidth="4" 
                     fill="none" 
                     strokeLinecap="round"
                     filter="url(#graphGlow)"
-                    opacity="0.9"
+                    opacity="0.95"
                   />
 
-                  {/* Graph trail dots */}
-                  {getGraphPoints().map((point, index) => (
-                    <circle
-                      key={index}
-                      cx={`${point.x}%`}
-                      cy={`${point.y}%`}
-                      r="1.5"
-                      fill="#ef4444"
-                      opacity={0.6 - (index * 0.01)}
-                    />
-                  ))}
-
-                  {/* Graph area fill */}
+                  {/* Graph area fill (optional, can be removed for pure line) */}
                   <path
-                    d={`${getTrajectoryPath()} L ${planePosition.left} 100 L 5 100 Z`}
+                    d={`${getGraphPath()} L ${planePosition.left} 100 L 5 100 Z`}
                     fill="url(#graphGradient)"
                     opacity="0.1"
                   />
@@ -923,7 +962,11 @@ export default function JetWinAviator() {
                       variant={betMode1 === "bet" ? "default" : "ghost"}
                       size="sm"
                       onClick={() => setBetMode1("bet")}
-                      className="px-8"
+                      className={
+                        betMode1 === "bet"
+                          ? "px-8 bg-green-600 hover:bg-green-700 text-white"
+                          : "px-8 bg-green-100 text-green-700 hover:bg-green-200"
+                      }
                     >
                       Bet
                     </Button>
@@ -931,7 +974,11 @@ export default function JetWinAviator() {
                       variant={betMode1 === "auto" ? "default" : "ghost"}
                       size="sm"
                       onClick={() => setBetMode1("auto")}
-                      className="px-8"
+                      className={
+                        betMode1 === "auto"
+                          ? "px-8 bg-green-600 hover:bg-green-700 text-white"
+                          : "px-8 bg-green-100 text-green-700 hover:bg-green-200"
+                      }
                     >
                       Auto
                     </Button>
@@ -1053,7 +1100,11 @@ export default function JetWinAviator() {
                       variant={betMode2 === "bet" ? "default" : "ghost"}
                       size="sm"
                       onClick={() => setBetMode2("bet")}
-                      className="px-8"
+                      className={
+                        betMode2 === "bet"
+                          ? "px-8 bg-green-600 hover:bg-green-700 text-white"
+                          : "px-8 bg-green-100 text-green-700 hover:bg-green-200"
+                      }
                     >
                       Bet
                     </Button>
@@ -1061,7 +1112,11 @@ export default function JetWinAviator() {
                       variant={betMode2 === "auto" ? "default" : "ghost"}
                       size="sm"
                       onClick={() => setBetMode2("auto")}
-                      className="px-8"
+                      className={
+                        betMode2 === "auto"
+                          ? "px-8 bg-green-600 hover:bg-green-700 text-white"
+                          : "px-8 bg-green-100 text-green-700 hover:bg-green-200"
+                      }
                     >
                       Auto
                     </Button>
@@ -1331,6 +1386,19 @@ export default function JetWinAviator() {
           </Button>
         </Link>
       </div>
+
+      {/* Sound Enable Modal */}
+      {showSoundModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
+          <div className="bg-gray-900 rounded-lg shadow-lg p-8 flex flex-col items-center">
+            <div className="text-2xl font-bold mb-4 text-white">Enable Sound</div>
+            <div className="mb-6 text-gray-300">Click below to enable game sounds</div>
+            <Button onClick={handleEnableSound} className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg font-bold rounded">
+              Enable Sound
+            </Button>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes moveBackground {
