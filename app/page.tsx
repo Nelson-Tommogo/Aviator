@@ -569,55 +569,60 @@ export default function JetWinAviator() {
   const graphHeight = 80
   const expBase = 1.045 // Controls curve steepness (tweak for realism)
 
-  // Generate graph points for the full curve
-  const getFullGraphPoints = () => {
+  // Generate graph points for the curve up to the current multiplier
+  const getGraphPointsToCurrent = () => {
     const points = []
+    const maxMultiplier = 20
+    // Find t for current multiplier
+    let tCurrent = 0
     for (let i = 0; i <= graphSteps; i++) {
       const t = i / graphSteps
-      // Exponential growth for multiplier
-      const multiplier = Math.pow(expBase, t * 20) // 1.0 to ~multiplier
-      // X grows linearly, Y grows with multiplier
+      const multiplierVal = 1 + (maxMultiplier - 1) * (1 - Math.exp(-3 * t))
+      if (multiplierVal >= multiplier) {
+        tCurrent = t
+        break
+      }
+    }
+    for (let i = 0; i <= graphSteps * tCurrent; i++) {
+      const t = i / graphSteps
+      const multiplierVal = 1 + (maxMultiplier - 1) * (1 - Math.exp(-3 * t))
       const x = graphStartX + t * graphWidth
-      // Map multiplier to graph height (log scale for realism)
-      const y = graphStartY - Math.log(multiplier) / Math.log(expBase) * (graphHeight / 20)
+      const y = graphStartY - ((multiplierVal - 1) / (maxMultiplier - 1)) * graphHeight
       points.push({ x, y })
     }
     return points
   }
 
-  // Get the current progress along the graph (based on multiplier)
-  const getCurrentGraphIndex = () => {
-    // Find the closest point where multiplier matches current
-    let closestIdx = 0
-    let minDiff = Infinity
-    for (let i = 0; i <= graphSteps; i++) {
-      const t = i / graphSteps
-      const m = Math.pow(expBase, t * 20)
-      const diff = Math.abs(m - multiplier)
-      if (diff < minDiff) {
-        minDiff = diff
-        closestIdx = i
-      }
-    }
-    return closestIdx
-  }
-
   // SVG path for the graph up to the current multiplier
   const getGraphPath = () => {
-    const points = getFullGraphPoints()
-    const idx = getCurrentGraphIndex()
+    const points = getGraphPointsToCurrent()
     if (points.length === 0) return ""
     let d = `M ${points[0].x}% ${points[0].y}%`
-    for (let i = 1; i <= idx; i++) {
+    for (let i = 1; i < points.length; i++) {
       d += ` L ${points[i].x}% ${points[i].y}%`
     }
     return d
   }
 
+  // SVG path for the area fill under the curve (from start, along curve, then vertical down, then back to start)
+  const getGraphAreaPath = () => {
+    const points = getGraphPointsToCurrent()
+    if (points.length === 0) return ""
+    let d = `M ${points[0].x}% ${points[0].y}%`
+    for (let i = 1; i < points.length; i++) {
+      d += ` L ${points[i].x}% ${points[i].y}%`
+    }
+    // Vertical line from plane down to bottom
+    d += ` L ${points[points.length - 1].x}% 100%`
+    // Line back to start along the bottom
+    d += ` L ${points[0].x}% 100% Z`
+    return d
+  }
+
   // Plane position along the graph
   const getPlaneGraphPosition = () => {
-    const points = getFullGraphPoints()
-    const idx = getCurrentGraphIndex()
+    const points = getGraphPointsToCurrent()
+    const idx = points.length - 1
     if (points.length === 0) return { left: "5%", bottom: "5%", transform: "rotate(-15deg)" }
     const pt = points[idx]
     // Calculate angle for plane tilt
@@ -866,7 +871,7 @@ export default function JetWinAviator() {
             {/* Graph Line Attached to Plane */}
             {gameState === "flying" && (
               <>
-                <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{zIndex: 10}}>
                   <defs>
                     <linearGradient id="graphGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                       <stop offset="0%" stopColor="#ef4444" stopOpacity="0.8" />
@@ -893,11 +898,11 @@ export default function JetWinAviator() {
                     opacity="0.95"
                   />
 
-                  {/* Graph area fill (optional, can be removed for pure line) */}
+                  {/* Area fill under the curve */}
                   <path
-                    d={`${getGraphPath()} L ${planePosition.left} 100 L 5 100 Z`}
+                    d={getGraphAreaPath()}
                     fill="url(#graphGradient)"
-                    opacity="0.1"
+                    opacity="0.13"
                   />
                 </svg>
               </>
@@ -1317,64 +1322,32 @@ export default function JetWinAviator() {
         </div>
       </div>
 
-      {/* Mobile Tabs */}
-      <div className="md:hidden flex bg-gray-800 border-t border-gray-700 flex-shrink-0">
-        {["All Bets", "Previous", "Top"].map((tab) => (
-          <Button
-            key={tab}
-            variant={activeTab === tab ? "default" : "ghost"}
-            onClick={() => setActiveTab(tab)}
-            className="flex-1 rounded-none"
-          >
-            {tab}
-          </Button>
-        ))}
-      </div>
-
-      {/* Mobile Bets List - Scrollable */}
-      <div className="md:hidden bg-gray-900 p-4 overflow-y-auto flex-1" style={{ height: 'calc(100vh - 64px - 200px)' }}>
-        <div className="text-sm text-gray-400 mb-2">{activeTab.toUpperCase()}</div>
-        <div className="text-lg font-bold mb-4">{getCurrentBets().length.toLocaleString()}</div>
-
+      {/* Mobile Tabs and Bets List - replaced with Cashout History on mobile */}
+      {/** Only show on mobile, hide on md+ */}
+      <div className="md:hidden bg-gray-900 p-4 flex-1 overflow-y-auto" style={{ height: 'calc(100vh - 64px - 200px)' }}>
+        <div className="text-sm font-semibold mb-2 text-white">Cashout History</div>
+        <div className="text-xs text-gray-400 mb-4">Recent winners and their cashouts</div>
         <div className="space-y-4">
-          {getCurrentBets()
-            .slice(0, 50)
-            .map((bet) => (
-              <div key={bet.id} className="bg-gray-800 p-4 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-sm">
-                      {bet.player.charAt(0)}
-                    </div>
-                    <span className="font-semibold">{bet.player}</span>
-                  </div>
-                  <div className="text-xs text-gray-400">{bet.timestamp.toLocaleDateString()}</div>
+          {cashoutHistory.slice(0, 100).map((cashout) => (
+            <div key={cashout.id} className="bg-gray-800 p-4 rounded-lg flex items-start space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg">
+                {cashout.avatar}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-semibold text-white">{cashout.player}</span>
+                  <span className="text-xs text-gray-400">{cashout.timestamp.toLocaleTimeString()}</span>
                 </div>
-
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <div className="text-gray-400">Bet KES</div>
-                    <div className="text-white font-semibold">{usdToKsh(bet.amount).toFixed(0)}</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-400">Result</div>
-                    <div className={`font-semibold ${bet.status === "win" ? "text-green-400" : "text-red-400"}`}>
-                      {bet.status === "win" ? `${bet.multiplier.toFixed(2)}x` : "Lost"}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-gray-400">Win KES</div>
-                    <div className={`font-semibold ${bet.status === "win" ? "text-green-400" : "text-red-400"}`}>
-                      {bet.status === "win" ? usdToKsh(bet.winAmount).toFixed(0) : "0"}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-gray-400">Round max.</div>
-                    <div className="text-purple-400 font-semibold">{bet.multiplier.toFixed(2)}x</div>
-                  </div>
+                <div className="text-xs text-gray-300 mb-1">Bet: {usdToKsh(cashout.amount).toFixed(0)} KES</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-green-400">{cashout.multiplier.toFixed(2)}x</span>
+                  <span className="text-sm font-bold text-yellow-400">
+                    +{usdToKsh(cashout.winAmount).toFixed(0)} KES
+                  </span>
                 </div>
               </div>
-            ))}
+            </div>
+          ))}
         </div>
       </div>
 
