@@ -432,6 +432,12 @@ export default function JetWinAviator() {
       return
     }
 
+    // ✅ Check if bet amount is at least $10
+    if (betAmount < 10) {
+      console.log("❌ Minimum bet amount is $10")
+      return
+    }
+
     // 🎲 PLACE THE BET - Deduct amount from balance and activate bet
     console.log(`🎯 Placing bet: $${betAmount.toFixed(2)}`)
     setBetActive(true)
@@ -1115,7 +1121,7 @@ export default function JetWinAviator() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setBetAmount(Math.max(1, betAmount - 1))}
+                    onClick={() => setBetAmount(Math.max(10, betAmount - 1))}
                     className="bg-gray-600 border-gray-500 text-white w-10 h-10 rounded-full"
                   >
                     -
@@ -1123,15 +1129,15 @@ export default function JetWinAviator() {
                   <Input
                     type="number"
                     value={betAmount.toFixed(2)}
-                    onChange={(e) => setBetAmount(Math.max(1, Number.parseFloat(e.target.value) || 1))}
+                    onChange={(e) => setBetAmount(Math.max(10, Number.parseFloat(e.target.value) || 10))}
                     className="text-2xl font-bold text-white min-w-[120px] text-center bg-gray-600 border-gray-500"
                     step="0.01"
-                    min="1"
+                    min="10"
                   />
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setBetAmount(betAmount + 1)}
+                    onClick={() => setBetAmount(Math.max(10, betAmount + 1))}
                     className="bg-gray-600 border-gray-500 text-white w-10 h-10 rounded-full"
                   >
                     +
@@ -1144,7 +1150,7 @@ export default function JetWinAviator() {
                       key={amount}
                       variant="outline"
                       size="sm"
-                      onClick={() => setBetAmount(amount)}
+                      onClick={() => setBetAmount(Math.max(10, amount))}
                       className="bg-gray-600 border-gray-500 text-white text-xs"
                     >
                       ${amount}
@@ -1187,7 +1193,7 @@ export default function JetWinAviator() {
                 {gameState === "waiting" ? (
                   <Button
                     onClick={placeBet}
-                    disabled={betActive || betAmount > balance}
+                    disabled={betActive || betAmount > balance || betAmount < 10}
                     className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-6 text-lg"
                   >
                     Bet
