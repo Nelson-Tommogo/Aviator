@@ -18,12 +18,35 @@ export default function DepositPage() {
 
   const handleMpesaDeposit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const amountNum = parseFloat(amount)
+    if (isNaN(amountNum) || amountNum < 10) {
+      alert("Minimum deposit is $10")
+      return
+    }
     setIsLoading(true)
-
-    setTimeout(() => {
+    // USD to Ksh conversion (fixed rate, update if needed)
+    const kshAmount = Math.round(amountNum * 140)
+    try {
+      const res = await fetch("https://av-backend-qp7e.onrender.com/stk/stk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: phoneNumber,
+          amount: kshAmount
+        })
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.message || "Deposit failed")
+        setIsLoading(false)
+        return
+      }
       setIsLoading(false)
       alert("M-Pesa STK Push sent to your phone. Please complete the transaction.")
-    }, 2000)
+    } catch (err) {
+      alert("Network error. Please try again.")
+      setIsLoading(false)
+    }
   }
 
   const quickAmounts = [10, 25, 50, 100, 250, 500]

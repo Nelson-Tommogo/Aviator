@@ -55,6 +55,8 @@ export default function JetWinAviator() {
   const [showTopCashouts, setShowTopCashouts] = useState(false)
   const [graphData, setGraphData] = useState<{x: number, y: number}[]>([])
   const [maxMultiplier, setMaxMultiplier] = useState(10)
+  const [profile, setProfile] = useState<any>(null)
+  const [greetingName, setGreetingName] = useState("")
 
   const audioRef = useRef<HTMLAudioElement>(null)
   const crashAudioRef = useRef<HTMLAudioElement>(null)
@@ -143,6 +145,17 @@ export default function JetWinAviator() {
     if (email) {
       setUserEmail(email)
       setIsAdmin(email === "admin@gmail.com")
+      // Greeting name logic
+      const namePart = email.split("@")[0]
+      setGreetingName(namePart.charAt(0).toUpperCase() + namePart.slice(1))
+      // Fetch profile
+      fetch("https://av-backend-qp7e.onrender.com/api/users/profile", {
+        method: "GET",
+        headers: { "Content-Type": "application/json", "email": email },
+      })
+        .then(res => res.json())
+        .then(data => setProfile(data))
+        .catch(() => setProfile(null))
     }
 
     // Load music preference
@@ -827,6 +840,12 @@ export default function JetWinAviator() {
             <Menu className="w-6 h-6" />
             <div className="text-2xl font-bold text-yellow-400">JetCash!</div>
             {isAdmin && <Badge className="bg-red-600 text-white">ADMIN MODE</Badge>}
+            {greetingName && (
+              <span className="ml-4 text-lg text-green-400">Hi {greetingName}</span>
+            )}
+            {profile && (
+              <span className="ml-4 text-sm text-gray-300">{profile.phone ? `Phone: ${profile.phone}` : ""}</span>
+            )}
           </div>
 
           <nav className="flex items-center space-x-6">

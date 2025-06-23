@@ -40,13 +40,30 @@ export default function SignupPage() {
       alert("Please agree to the terms and conditions")
       return
     }
-
     setIsLoading(true)
-
-    setTimeout(() => {
+    try {
+      const res = await fetch("https://av-backend-qp7e.onrender.com/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: formData.phone,
+          email: formData.email,
+          password: formData.password
+        })
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.message || "Signup failed")
+        setIsLoading(false)
+        return
+      }
+      localStorage.setItem("jetcash-user-email", formData.email)
       setIsLoading(false)
       window.location.href = "/"
-    }, 2000)
+    } catch (err) {
+      alert("Network error. Please try again.")
+      setIsLoading(false)
+    }
   }
 
   return (
