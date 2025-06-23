@@ -55,6 +55,8 @@ export default function JetWinAviator() {
   const [showTopCashouts, setShowTopCashouts] = useState(false)
   const [graphData, setGraphData] = useState<{x: number, y: number}[]>([])
   const [maxMultiplier, setMaxMultiplier] = useState(10)
+  const [profile, setProfile] = useState<any>(null)
+  const [greetingName, setGreetingName] = useState("")
 
   const audioRef = useRef<HTMLAudioElement>(null)
   const crashAudioRef = useRef<HTMLAudioElement>(null)
@@ -143,6 +145,17 @@ export default function JetWinAviator() {
     if (email) {
       setUserEmail(email)
       setIsAdmin(email === "admin@gmail.com")
+      // Greeting name logic
+      const namePart = email.split("@")[0]
+      setGreetingName(namePart.charAt(0).toUpperCase() + namePart.slice(1))
+      // Fetch profile
+      fetch("https://av-backend-qp7e.onrender.com/api/users/profile", {
+        method: "GET",
+        headers: { "Content-Type": "application/json", "email": email },
+      })
+        .then(res => res.json())
+        .then(data => setProfile(data))
+        .catch(() => setProfile(null))
     }
 
     // Load music preference
@@ -429,6 +442,12 @@ export default function JetWinAviator() {
     // ✅ Check if bet is already active (prevent double betting)
     if (betActive) {
       console.log("❌ Bet already placed for this round")
+      return
+    }
+
+    // ✅ Check if bet amount is at least $10
+    if (betAmount < 10) {
+      console.log("❌ Minimum bet amount is $10")
       return
     }
 
@@ -821,6 +840,12 @@ export default function JetWinAviator() {
             <Menu className="w-6 h-6" />
             <div className="text-2xl font-bold text-yellow-400">JetCash!</div>
             {isAdmin && <Badge className="bg-red-600 text-white">ADMIN MODE</Badge>}
+            {greetingName && (
+              <span className="ml-4 text-lg text-green-400">Hi {greetingName}</span>
+            )}
+            {profile && (
+              <span className="ml-4 text-sm text-gray-300">{profile.phone ? `Phone: ${profile.phone}` : ""}</span>
+            )}
           </div>
 
           <nav className="flex items-center space-x-6">
@@ -1115,7 +1140,7 @@ export default function JetWinAviator() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setBetAmount(Math.max(1, betAmount - 1))}
+                    onClick={() => setBetAmount(Math.max(10, betAmount - 1))}
                     className="bg-gray-600 border-gray-500 text-white w-10 h-10 rounded-full"
                   >
                     -
@@ -1123,15 +1148,15 @@ export default function JetWinAviator() {
                   <Input
                     type="number"
                     value={betAmount.toFixed(2)}
-                    onChange={(e) => setBetAmount(Math.max(1, Number.parseFloat(e.target.value) || 1))}
+                    onChange={(e) => setBetAmount(Math.max(10, Number.parseFloat(e.target.value) || 10))}
                     className="text-2xl font-bold text-white min-w-[120px] text-center bg-gray-600 border-gray-500"
                     step="0.01"
-                    min="1"
+                    min="10"
                   />
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setBetAmount(betAmount + 1)}
+                    onClick={() => setBetAmount(Math.max(10, betAmount + 1))}
                     className="bg-gray-600 border-gray-500 text-white w-10 h-10 rounded-full"
                   >
                     +
@@ -1144,7 +1169,7 @@ export default function JetWinAviator() {
                       key={amount}
                       variant="outline"
                       size="sm"
-                      onClick={() => setBetAmount(amount)}
+                      onClick={() => setBetAmount(Math.max(10, amount))}
                       className="bg-gray-600 border-gray-500 text-white text-xs"
                     >
                       ${amount}
@@ -1187,7 +1212,7 @@ export default function JetWinAviator() {
                 {gameState === "waiting" ? (
                   <Button
                     onClick={placeBet}
-                    disabled={betActive || betAmount > balance}
+                    disabled={betActive || betAmount > balance || betAmount < 10}
                     className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-6 text-lg"
                   >
                     Bet

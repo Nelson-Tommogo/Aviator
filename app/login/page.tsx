@@ -19,13 +19,26 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-
-    setTimeout(() => {
-      setIsLoading(false)
-      // Store user email for admin detection
+    try {
+      const res = await fetch("https://av-backend-qp7e.onrender.com/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.message || "Login failed")
+        setIsLoading(false)
+        return
+      }
+      // Optionally store token if returned: const { token } = await res.json()
       localStorage.setItem("jetcash-user-email", email)
+      setIsLoading(false)
       window.location.href = "/"
-    }, 2000)
+    } catch (err) {
+      alert("Network error. Please try again.")
+      setIsLoading(false)
+    }
   }
 
   return (
