@@ -1296,10 +1296,10 @@ export default function JetWinAviator() {
       {/* Sound Enable Modal */}
       {showSoundModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
-          <div className="bg-gray-900 rounded-lg shadow-lg p-8 flex flex-col items-center">
-            <div className="text-2xl font-bold mb-4 text-white">Enable Sound</div>
-            <div className="mb-6 text-gray-300">Click below to enable game sounds or continue without sound</div>
-            <div className="flex items-center space-x-4 mb-6">
+          <div className="bg-gray-900 rounded-lg shadow-lg p-4 w-80 max-w-full flex flex-col items-center">
+            <div className="text-xl font-bold mb-2 text-white">Enable Sound?</div>
+            <div className="mb-4 text-gray-300 text-center text-sm">Would you like to enable game sounds?</div>
+            <div className="flex items-center space-x-2 mb-2 w-full justify-center">
               <Button
                 onClick={async () => {
                   setMusicEnabled(true)
@@ -1309,10 +1309,9 @@ export default function JetWinAviator() {
                   }
                   setShowSoundModal(false)
                 }}
-                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 text-lg font-bold rounded flex items-center space-x-2"
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 text-base font-bold rounded flex-1"
               >
-                <Volume2 className="w-6 h-6 mr-2" />
-                Enable Sound
+                Yes
               </Button>
               <Button
                 onClick={() => {
@@ -1322,10 +1321,21 @@ export default function JetWinAviator() {
                   }
                   setShowSoundModal(false)
                 }}
-                className="bg-gray-700 hover:bg-gray-800 text-white px-6 py-3 text-lg font-bold rounded flex items-center space-x-2"
+                className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 text-base font-bold rounded flex-1"
               >
-                <VolumeX className="w-6 h-6 mr-2" />
-                Continue without Sound
+                No
+              </Button>
+              <Button
+                onClick={() => {
+                  setMusicEnabled(true)
+                  if (welcomeAudioRef.current) {
+                    welcomeAudioRef.current.muted = false
+                  }
+                  setShowSoundModal(false)
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-base font-bold rounded flex-1"
+              >
+                Default
               </Button>
             </div>
           </div>
