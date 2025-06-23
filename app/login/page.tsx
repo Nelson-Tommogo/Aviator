@@ -46,7 +46,6 @@ export default function LoginPage() {
             <CardDescription className="text-gray-400">
               Enter your credentials to access your account
               <br />
-              <span className="text-yellow-400 text-xs">Use admin@jetcash.com for admin mode</span>
             </CardDescription>
           </CardHeader>
           <CardContent>
