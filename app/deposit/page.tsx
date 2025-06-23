@@ -134,7 +134,8 @@ export default function DepositPage() {
                     <strong>How it works:</strong>
                     <ol className="list-decimal list-inside mt-2 space-y-1">
                       <li>Enter your M-Pesa number and amount</li>
-                      <li>Click "Send STK Push"</li>
+                      <li>Minimum amount USD 10</li>
+                      <li>Click "Deposit"</li>
                       <li>Check your phone for M-Pesa prompt</li>
                       <li>Enter your M-Pesa PIN to complete</li>
                     </ol>
