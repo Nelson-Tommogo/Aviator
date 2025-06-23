@@ -52,6 +52,7 @@ export default function JetWinAviator() {
   const [musicEnabled, setMusicEnabled] = useState(true)
   const [audioInitialized, setAudioInitialized] = useState(false)
   const [showSoundModal, setShowSoundModal] = useState(false)
+  const [showTopCashouts, setShowTopCashouts] = useState(false)
 
   const audioRef = useRef<HTMLAudioElement>(null)
   const crashAudioRef = useRef<HTMLAudioElement>(null)
@@ -1008,7 +1009,7 @@ export default function JetWinAviator() {
           </div>
 
           {/* Single Betting Panel */}
-          <div className="bg-gray-800 p-4 md:p-6 flex-shrink-0">
+          <div className="bg-gray-800 p-4 md:p-6 flex-shrink-0 mb-0">
             <div className="max-w-md mx-auto">
               <div className="bg-gray-700 border border-gray-600 p-4 rounded-lg">
                 <div className="flex justify-center mb-4">
@@ -1145,8 +1146,8 @@ export default function JetWinAviator() {
             </div>
           </div>
 
-          {/* Footer */}
-          <footer className="bg-gray-800 border-t border-gray-700 p-4 text-center flex-shrink-0">
+          {/* Desktop Footer - only show on desktop, after main game area */}
+          <footer className="hidden md:block bg-gray-800 border-t border-gray-700 p-4 text-center flex-shrink-0">
             <div className="flex items-center justify-center space-x-2 mb-2">
               <span className="text-sm text-gray-400">✓ Provably Fair Game</span>
             </div>
@@ -1159,16 +1160,25 @@ export default function JetWinAviator() {
           <div className="p-4 border-b border-gray-700 flex-shrink-0">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-semibold">Cashout History</span>
-              <Button
-                size="sm"
-                onClick={() => setShowRules(!showRules)}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Info className="w-4 h-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  className={showTopCashouts ? "bg-yellow-500 text-black" : "bg-gray-700 text-white"}
+                  onClick={() => setShowTopCashouts((prev) => !prev)}
+                >
+                  {showTopCashouts ? "Recent" : "Top Results"}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setShowRules(!showRules)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Info className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
             <div className="text-xs text-gray-400">
-              <div>Recent winners and their cashouts</div>
+              <div>{showTopCashouts ? "Biggest wins (highest win amounts)" : "Recent winners and their cashouts"}</div>
             </div>
           </div>
 
@@ -1198,7 +1208,10 @@ export default function JetWinAviator() {
           ) : (
             <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-3">
-                {cashoutHistory.slice(0, 100).map((cashout) => (
+                {(showTopCashouts
+                  ? [...cashoutHistory].sort((a, b) => b.winAmount - a.winAmount).slice(0, 50)
+                  : cashoutHistory.slice(0, 100)
+                ).map((cashout) => (
                   <div key={cashout.id} className="flex items-start space-x-3 bg-gray-700 p-3 rounded-lg">
                     <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg">
                       {cashout.avatar}
@@ -1208,10 +1221,10 @@ export default function JetWinAviator() {
                         <span className="text-sm font-semibold text-white">{cashout.player}</span>
                         <span className="text-xs text-gray-400">{cashout.timeAgo}</span>
                       </div>
-                      <div className="text-xs text-gray-300">Bet: ${cashout.amount.toFixed(0)}</div>
+                      <div className="text-xs text-gray-300">Bet: ${cashout.amount.toFixed(2)}</div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-green-400">{cashout.multiplier.toFixed(2)}x</span>
-                        <span className="text-sm font-bold text-yellow-400">+${cashout.winAmount.toFixed(0)}</span>
+                        <span className="text-sm font-bold text-yellow-400">+${cashout.winAmount.toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
@@ -1222,15 +1235,26 @@ export default function JetWinAviator() {
         </div>
       </div>
 
-      {/* Mobile Cashout History */}
-      <div
-        className="md:hidden bg-gray-900 p-4 flex-1 overflow-y-auto"
-        style={{ height: "calc(100vh - 64px - 200px)" }}
-      >
-        <div className="text-sm font-semibold mb-2 text-white">Cashout History</div>
-        <div className="text-xs text-gray-400 mb-4">Recent winners and their cashouts</div>
+      {/* Mobile Cashout History with Top Results button */}
+      <div className="md:hidden bg-gray-900 p-3 flex-1 overflow-y-auto" style={{ height: 'calc(100vh - 64px - 200px)' }}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-sm font-semibold text-white">Cashout History</div>
+          <Button
+            size="sm"
+            className={showTopCashouts ? "bg-yellow-500 text-black" : "bg-gray-700 text-white"}
+            onClick={() => setShowTopCashouts((prev) => !prev)}
+          >
+            {showTopCashouts ? "Recent" : "Top Results"}
+          </Button>
+        </div>
+        <div className="text-xs text-gray-400 mb-4">
+          {showTopCashouts ? "Biggest wins (highest win amounts)" : "Recent winners and their cashouts"}
+        </div>
         <div className="space-y-4">
-          {cashoutHistory.slice(0, 100).map((cashout) => (
+          {(showTopCashouts
+            ? [...cashoutHistory].sort((a, b) => b.winAmount - a.winAmount).slice(0, 50)
+            : cashoutHistory.slice(0, 100)
+          ).map((cashout) => (
             <div key={cashout.id} className="bg-gray-800 p-4 rounded-lg flex items-start space-x-3">
               <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg">
                 {cashout.avatar}
@@ -1238,17 +1262,26 @@ export default function JetWinAviator() {
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-semibold text-white">{cashout.player}</span>
-                  <span className="text-xs text-gray-400">{cashout.timeAgo}</span>
+                  <span className="text-xs text-gray-400">{cashout.timestamp.toLocaleTimeString()}</span>
                 </div>
-                <div className="text-xs text-gray-300 mb-1">Bet: ${cashout.amount.toFixed(0)}</div>
+                <div className="text-xs text-gray-300 mb-1">Bet: ${cashout.amount.toFixed(2)}</div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold text-green-400">{cashout.multiplier.toFixed(2)}x</span>
-                  <span className="text-sm font-bold text-yellow-400">+${cashout.winAmount.toFixed(0)}</span>
+                  <span className="text-sm font-bold text-yellow-400">
+                    +${cashout.winAmount.toFixed(2)}
+                  </span>
                 </div>
               </div>
             </div>
           ))}
         </div>
+        {/* Mobile Footer - only show on mobile, after cashout history */}
+        <footer className="bg-gray-800 border-t border-gray-700 p-4 text-center mt-2 md:hidden">
+          <div className="flex items-center justify-center space-x-2 mb-2">
+            <span className="text-sm text-gray-400">✓ Provably Fair Game</span>
+          </div>
+          <div className="text-xs text-gray-500">Powered by SPRIBE</div>
+        </footer>
       </div>
 
       {/* Mobile Deposit Button */}
@@ -1265,13 +1298,36 @@ export default function JetWinAviator() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
           <div className="bg-gray-900 rounded-lg shadow-lg p-8 flex flex-col items-center">
             <div className="text-2xl font-bold mb-4 text-white">Enable Sound</div>
-            <div className="mb-6 text-gray-300">Click below to enable game sounds</div>
-            <Button
-              onClick={handleEnableSound}
-              className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg font-bold rounded"
-            >
-              Enable Sound
-            </Button>
+            <div className="mb-6 text-gray-300">Click below to enable game sounds or continue without sound</div>
+            <div className="flex items-center space-x-4 mb-6">
+              <Button
+                onClick={async () => {
+                  setMusicEnabled(true)
+                  if (welcomeAudioRef.current) {
+                    welcomeAudioRef.current.muted = false
+                    await welcomeAudioRef.current.play()
+                  }
+                  setShowSoundModal(false)
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 text-lg font-bold rounded flex items-center space-x-2"
+              >
+                <Volume2 className="w-6 h-6 mr-2" />
+                Enable Sound
+              </Button>
+              <Button
+                onClick={() => {
+                  setMusicEnabled(false)
+                  if (welcomeAudioRef.current) {
+                    welcomeAudioRef.current.muted = true
+                  }
+                  setShowSoundModal(false)
+                }}
+                className="bg-gray-700 hover:bg-gray-800 text-white px-6 py-3 text-lg font-bold rounded flex items-center space-x-2"
+              >
+                <VolumeX className="w-6 h-6 mr-2" />
+                Continue without Sound
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -1329,3 +1385,4 @@ export default function JetWinAviator() {
     </div>
   )
 }
+
