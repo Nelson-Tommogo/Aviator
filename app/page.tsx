@@ -53,6 +53,8 @@ export default function JetWinAviator() {
   const [audioInitialized, setAudioInitialized] = useState(false)
   const [showSoundModal, setShowSoundModal] = useState(false)
   const [showTopCashouts, setShowTopCashouts] = useState(false)
+  const [graphData, setGraphData] = useState<{x: number, y: number}[]>([])
+  const [maxMultiplier, setMaxMultiplier] = useState(10)
 
   const audioRef = useRef<HTMLAudioElement>(null)
   const crashAudioRef = useRef<HTMLAudioElement>(null)
@@ -62,6 +64,7 @@ export default function JetWinAviator() {
   const manualCashoutRef = useRef<boolean>(false)
   const welcomeAudioRef = useRef<HTMLAudioElement>(null)
   const flewAudioRef = useRef<HTMLAudioElement>(null)
+  const gameCanvasRef = useRef<HTMLDivElement>(null)
 
   // Generate anonymous player name
   const generatePlayerName = () => {
@@ -531,6 +534,7 @@ export default function JetWinAviator() {
     setGameState("flying")
     setMultiplier(1.0)
     setBetCashed(false)
+    setGraphData([]) // Reset graph when new round starts
 
     // 🎵 Play takeoff sound
     playTakeoffSound()
@@ -546,31 +550,31 @@ export default function JetWinAviator() {
       const speedFluctuation = 0.9 + Math.random() * 0.4 // 0.9 to 1.3
       const increment = (0.015 + currentMultiplier * 0.002) * baseSpeed * speedFluctuation
       currentMultiplier += increment
+      // Update state together for perfect sync
       setMultiplier(currentMultiplier)
-
+      setGraphData(prev => [
+        ...prev,
+        { x: currentMultiplier, y: currentMultiplier }
+      ])
       // 🤖 Check auto cash-out
       handleAutoCashOut(currentMultiplier)
-
       // 💥 Check crash condition
       if (currentMultiplier >= crashPointRef.current || manualCashoutRef.current) {
         console.log(`💥 Game crashed at ${currentMultiplier.toFixed(2)}x`)
         setGameState("crashed")
         clearInterval(gameIntervalRef.current!)
         playCrashSound()
-
         // 📊 Update multiplier history
         setPreviousMultipliers((prev) => {
           const newMultipliers = [Number(currentMultiplier.toFixed(2)), ...prev.slice(0, 24)]
           return newMultipliers
         })
-
         // ⏰ Reset game after 3 seconds
         setTimeout(() => {
           console.log("🔄 Resetting game for next round")
           setGameState("waiting")
           setBetActive(false)
           setBetCashed(false)
-
           // 🤖 Trigger auto-bet for next round
           if (autoBet) {
             console.log("🤖 Auto-bet enabled - will place bet in next round")
@@ -711,6 +715,63 @@ export default function JetWinAviator() {
     if (multiplier <= 10.0) return "bg-green-500 text-white"
     return "bg-blue-500 text-white"
   }
+
+  const FlightGraph = ({ data, currentMultiplier }: { data: {x: number, y: number}[], currentMultiplier: number }) => {
+    // Use the same positioning logic as the plane
+    const getPlanePosition = (mult: number) => {
+      const baseLeft = Math.min(85, 2 + (mult - 1) * 12);
+      const baseBottom = Math.min(80, 2 + (mult - 1) * 10);
+      const fastOscillation = Math.sin(mult * 3) * 8;
+      const quickVariation = Math.cos(mult * 2.5) * 5;
+      const dramaticMove = 0; // Don't use random for graph
+      const finalLeft = Math.max(2, Math.min(85, baseLeft + fastOscillation + dramaticMove));
+      const finalBottom = Math.max(2, Math.min(80, baseBottom + quickVariation));
+      return { left: finalLeft, bottom: finalBottom };
+    };
+    // Convert percentage positions to SVG coordinates
+    const points = data.map(point => {
+      const pos = getPlanePosition(point.x);
+      return {
+        x: pos.left,
+        y: 100 - pos.bottom // Flip Y-axis for SVG
+      };
+    });
+    const currentPos = getPlanePosition(currentMultiplier);
+    const currentPoint = {
+      x: currentPos.left,
+      y: 100 - currentPos.bottom
+    };
+    // Build path data
+    const pathData = points.length > 0
+      ? `M ${points[0].x} ${points[0].y} ` + 
+        points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ') + 
+        ` L ${currentPoint.x} ${currentPoint.y}`
+      : '';
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        className="absolute inset-0 w-full h-full pointer-events-none"
+        style={{ zIndex: 9 }}
+      >
+        <path
+          d={pathData}
+          stroke="#10B981"
+          strokeWidth="0.5"
+          fill="none"
+          strokeLinecap="round"
+        />
+        {gameState === "flying" && (
+          <circle
+            cx={currentPoint.x}
+            cy={currentPoint.y}
+            r="1"
+            fill="#10B981"
+          />
+        )}
+      </svg>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
@@ -889,6 +950,7 @@ export default function JetWinAviator() {
 
           {/* Game Canvas */}
           <div
+            ref={gameCanvasRef}
             className="relative h-64 md:h-96 overflow-hidden flex-shrink-0"
             style={{
               background: `
@@ -937,7 +999,7 @@ export default function JetWinAviator() {
                 bottom: planePosition.bottom,
                 transform: planePosition.transform,
                 filter: gameState === "flying" ? "drop-shadow(0 0 10px rgba(255,255,255,0.3))" : "none",
-                zIndex: 15,
+                zIndex: 20,
               }}
             >
               {/* 🛩️ LIGHTER PLANE ICON */}
@@ -1006,6 +1068,14 @@ export default function JetWinAviator() {
                 <div className="text-4xl md:text-6xl font-bold text-red-400 drop-shadow-lg">FLEW AWAY!</div>
               )}
             </div>
+
+            {/* Add this for the graph */}
+            {gameState === "flying" && (
+              <FlightGraph 
+                data={graphData} 
+                currentMultiplier={multiplier} 
+              />
+            )}
           </div>
 
           {/* Single Betting Panel */}
@@ -1390,6 +1460,16 @@ export default function JetWinAviator() {
           50% {
             transform: translateX(-50%) rotate(2deg);
           }
+        }
+
+        @keyframes graphFadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .flight-graph {
+          animation: graphFadeIn 0.5s ease-out;
+          z-index: 10;
+          box-shadow: 0 0 10px rgba(0,0,0,0.5);
         }
       `}</style>
     </div>
