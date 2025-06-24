@@ -1500,4 +1500,3 @@ export default function JetWinAviator() {
     </div>
   )
 }
-

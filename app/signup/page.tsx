@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,36 +31,48 @@ export default function SignupPage() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
+
     if (formData.password !== formData.confirmPassword) {
       alert("Passwords don't match!")
       return
     }
+
     if (!formData.agreeTerms) {
       alert("Please agree to the terms and conditions")
       return
     }
+
     setIsLoading(true)
+
     try {
       const res = await fetch("https://av-backend-qp7e.onrender.com/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          phone: formData.phone,
           email: formData.email,
-          password: formData.password
-        })
+          password: formData.password,
+          phone: formData.phone,
+          firstname: formData.firstName,
+          lastname: formData.lastName,
+        }),
       })
+
+      const data = await res.json()
+
       if (!res.ok) {
-        const data = await res.json()
         alert(data.message || "Signup failed")
         setIsLoading(false)
         return
       }
+
+      // Save the registered email (optional for pre-filling later)
       localStorage.setItem("jetcash-user-email", formData.email)
-      setIsLoading(false)
-      window.location.href = "/"
+
+      alert("Account created successfully! Please log in.")
+      window.location.href = "/login"
     } catch (err) {
       alert("Network error. Please try again.")
+    } finally {
       setIsLoading(false)
     }
   }
@@ -87,9 +98,7 @@ export default function SignupPage() {
             <form onSubmit={handleSignup} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName" className="text-white">
-                    First Name
-                  </Label>
+                  <Label htmlFor="firstName" className="text-white">First Name</Label>
                   <Input
                     id="firstName"
                     name="firstName"
@@ -101,9 +110,7 @@ export default function SignupPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName" className="text-white">
-                    Last Name
-                  </Label>
+                  <Label htmlFor="lastName" className="text-white">Last Name</Label>
                   <Input
                     id="lastName"
                     name="lastName"
@@ -117,9 +124,7 @@ export default function SignupPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-white">
-                  Email
-                </Label>
+                <Label htmlFor="email" className="text-white">Email</Label>
                 <Input
                   id="email"
                   name="email"
@@ -133,14 +138,12 @@ export default function SignupPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-white">
-                  Phone Number
-                </Label>
+                <Label htmlFor="phone" className="text-white">Phone Number</Label>
                 <Input
                   id="phone"
                   name="phone"
                   type="tel"
-                  placeholder="+254 700 000 000"
+                  placeholder="0759735509"
                   value={formData.phone}
                   onChange={handleInputChange}
                   className="bg-gray-700 border-gray-600 text-white"
@@ -149,9 +152,7 @@ export default function SignupPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-white">
-                  Password
-                </Label>
+                <Label htmlFor="password" className="text-white">Password</Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -176,9 +177,7 @@ export default function SignupPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-white">
-                  Confirm Password
-                </Label>
+                <Label htmlFor="confirmPassword" className="text-white">Confirm Password</Label>
                 <div className="relative">
                   <Input
                     id="confirmPassword"
@@ -206,7 +205,9 @@ export default function SignupPage() {
                 <Checkbox
                   id="terms"
                   checked={formData.agreeTerms}
-                  onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, agreeTerms: checked as boolean }))}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({ ...prev, agreeTerms: checked as boolean }))
+                  }
                 />
                 <Label htmlFor="terms" className="text-sm text-gray-400">
                   I agree to the{" "}

@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,24 +18,36 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+
     try {
       const res = await fetch("https://av-backend-qp7e.onrender.com/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
       })
+
+      const data = await res.json()
+
       if (!res.ok) {
-        const data = await res.json()
         alert(data.message || "Login failed")
         setIsLoading(false)
         return
       }
-      // Optionally store token if returned: const { token } = await res.json()
-      localStorage.setItem("jetcash-user-email", email)
-      setIsLoading(false)
+
+      // Save login data to localStorage
+      localStorage.setItem("token", data.token)
+      localStorage.setItem("jetcash-user", JSON.stringify(data.user))
+      localStorage.setItem("jetcash-user-id", data.user.id)
+      localStorage.setItem("jetcash-user-email", data.user.email)
+      localStorage.setItem("jetcash-user-phone", data.user.phone)
+      localStorage.setItem("jetcash-user-firstname", data.user.firstname)
+      localStorage.setItem("jetcash-user-lastname", data.user.lastname)
+
+      alert("Login successful")
       window.location.href = "/"
-    } catch (err) {
+    } catch (error) {
       alert("Network error. Please try again.")
+    } finally {
       setIsLoading(false)
     }
   }
@@ -58,7 +69,6 @@ export default function LoginPage() {
             <CardTitle className="text-white">Sign In</CardTitle>
             <CardDescription className="text-gray-400">
               Enter your credentials to access your account
-              <br />
             </CardDescription>
           </CardHeader>
           <CardContent>

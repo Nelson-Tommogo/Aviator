@@ -1,8 +1,8 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,74 +15,144 @@ export default function DepositPage() {
   const [phoneNumber, setPhoneNumber] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [depositMethod, setDepositMethod] = useState("mpesa")
+  const [kshAmount, setKshAmount] = useState(0)
+  const [cardDetails, setCardDetails] = useState({
+    number: "",
+    expiry: "",
+    cvv: "",
+    name: ""
+  })
+  const router = useRouter()
+
+  // Convert USD to KSH in real-time (background calculation)
+  useEffect(() => {
+    const amountNum = parseFloat(amount) || 0
+    setKshAmount(Math.round(amountNum * 130))
+  }, [amount])
+
+  useEffect(() => {
+    const token = localStorage.getItem("token")
+    if (!token) {
+      router.push("/login")
+    } else {
+      fetch("https://av-backend-qp7e.onrender.com/api/auth/me", {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(res => {
+        if (!res.ok) {
+          localStorage.removeItem("token")
+          router.push("/login")
+        }
+      }).catch(() => {
+        localStorage.removeItem("token")
+        router.push("/login")
+      })
+    }
+  }, [router])
 
   const handleMpesaDeposit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validate amount
     const amountNum = parseFloat(amount)
-    if (isNaN(amountNum) || amountNum < 10) {
-      alert("Minimum deposit is $10")
+    if (isNaN(amountNum)) {
+      alert("Please enter a valid amount")
       return
     }
+    if (amountNum < 100) {
+      alert("Minimum deposit is $100")
+      return
+    }
+
+    // Validate and format phone number
+    const cleanedPhone = phoneNumber.replace(/\D/g, '')
+    let formattedPhone = cleanedPhone
+    
+    // Auto-correct common formats
+    if (cleanedPhone.startsWith('0') && cleanedPhone.length === 10) {
+      formattedPhone = '254' + cleanedPhone.substring(1)
+    } else if (cleanedPhone.startsWith('7') && cleanedPhone.length === 9) {
+      formattedPhone = '254' + cleanedPhone
+    } else if (!cleanedPhone.startsWith('254') || cleanedPhone.length !== 12) {
+      alert("Please enter a valid M-Pesa number (format: 254XXXXXXXXX)")
+      return
+    }
+
     setIsLoading(true)
-    // USD to Ksh conversion (fixed rate, update if needed)
-    const kshAmount = Math.round(amountNum * 140)
+    const token = localStorage.getItem("token")
+    
     try {
-      const res = await fetch("https://av-backend-qp7e.onrender.com/stk/stk", {
+      const response = await fetch("https://av-backend-qp7e.onrender.com/api/stk/stk", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phone: phoneNumber,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          phoneNumber: formattedPhone, 
           amount: kshAmount
         })
       })
-      if (!res.ok) {
-        const data = await res.json()
-        alert(data.message || "Deposit failed")
-        setIsLoading(false)
-        return
+
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.message || "Deposit failed")
       }
-      setIsLoading(false)
-      alert("M-Pesa STK Push sent to your phone. Please complete the transaction.")
-    } catch (err) {
-      alert("Network error. Please try again.")
+
+      alert("Payment request sent to your phone. Please complete the payment.")
+      setAmount("")
+      setPhoneNumber("")
+    } catch (error: any) {
+      alert(error.message || "An error occurred. Please try again.")
+      console.error("Deposit error:", error)
+    } finally {
       setIsLoading(false)
     }
   }
 
-  const quickAmounts = [10, 25, 50, 100, 250, 500]
+  const handleCardDetailsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setCardDetails(prev => ({
+      ...prev,
+      [name]: value
+    }))
+  }
+
+  const quickAmounts = [100, 250, 500, 1000, 2500]
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4">
       <div className="max-w-md mx-auto">
+        {/* Back & Header */}
         <div className="mb-6">
           <Link href="/" className="inline-flex items-center text-yellow-400 hover:text-yellow-300 mb-4">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Game
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Game
           </Link>
           <h1 className="text-2xl font-bold text-yellow-400">Deposit Funds</h1>
-          <p className="text-gray-400 mt-2">Add money to your JetCash account</p>
+          <p className="text-gray-400 mt-2">Add money to your account</p>
         </div>
 
+        {/* Method Selector */}
         <div className="grid grid-cols-3 gap-2 mb-6">
-          <Button
-            variant={depositMethod === "mpesa" ? "default" : "outline"}
-            onClick={() => setDepositMethod("mpesa")}
+          <Button 
+            variant={depositMethod === "mpesa" ? "default" : "outline"} 
+            onClick={() => setDepositMethod("mpesa")} 
             className="flex flex-col items-center p-4 h-auto"
           >
             <Smartphone className="w-6 h-6 mb-2" />
             <span className="text-xs">M-Pesa</span>
           </Button>
-          <Button
-            variant={depositMethod === "card" ? "default" : "outline"}
-            onClick={() => setDepositMethod("card")}
+          <Button 
+            variant={depositMethod === "card" ? "default" : "outline"} 
+            onClick={() => setDepositMethod("card")} 
             className="flex flex-col items-center p-4 h-auto"
           >
             <CreditCard className="w-6 h-6 mb-2" />
             <span className="text-xs">Card</span>
           </Button>
-          <Button
-            variant={depositMethod === "bank" ? "default" : "outline"}
-            onClick={() => setDepositMethod("bank")}
+          <Button 
+            variant={depositMethod === "bank" ? "default" : "outline"} 
+            onClick={() => setDepositMethod("bank")} 
             className="flex flex-col items-center p-4 h-auto"
           >
             <Banknote className="w-6 h-6 mb-2" />
@@ -90,6 +160,7 @@ export default function DepositPage() {
           </Button>
         </div>
 
+        {/* M-Pesa Deposit Form */}
         {depositMethod === "mpesa" && (
           <Card className="bg-gray-800 border-gray-700">
             <CardHeader>
@@ -98,186 +169,194 @@ export default function DepositPage() {
                 M-Pesa Deposit
               </CardTitle>
               <CardDescription className="text-gray-400">
-                Enter your M-Pesa number and amount to deposit
+                Enter your M-Pesa number and amount
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleMpesaDeposit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="phone" className="text-white">
-                    M-Pesa Phone Number
-                  </Label>
+                  <Label htmlFor="mpesa-phone" className="text-white">M-Pesa Number</Label>
                   <Input
-                    id="phone"
+                    id="mpesa-phone"
                     type="tel"
-                    placeholder="254700000000"
+                    placeholder="2547XXXXXXXX"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     className="bg-gray-700 border-gray-600 text-white"
                     required
                   />
+                  <p className="text-xs text-gray-400">Format: 2547XXXXXXXX</p>
                 </div>
-
+                
                 <div className="space-y-2">
-                  <Label htmlFor="amount" className="text-white">
-                    Amount ($)
-                  </Label>
+                  <Label htmlFor="mpesa-amount" className="text-white">Amount ($)</Label>
                   <Input
-                    id="amount"
+                    id="mpesa-amount"
                     type="number"
-                    placeholder="Enter amount"
+                    placeholder="100"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     className="bg-gray-700 border-gray-600 text-white"
-                    min="1"
+                    min="100"
                     required
                   />
                 </div>
-
-                <div className="space-y-2">
-                  <Label className="text-white">Quick Amounts</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {quickAmounts.map((quickAmount) => (
-                      <Button
-                        key={quickAmount}
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setAmount(quickAmount.toString())}
-                        className="bg-gray-700 border-gray-600 text-white"
-                      >
-                        ${quickAmount}
-                      </Button>
-                    ))}
-                  </div>
+                
+                <div className="grid grid-cols-3 gap-2">
+                  {quickAmounts.map((amt) => (
+                    <Button
+                      key={amt}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAmount(amt.toString())}
+                      className="bg-gray-700 border-gray-600 text-white"
+                    >
+                      ${amt}
+                    </Button>
+                  ))}
                 </div>
-
-                <div className="bg-green-900/20 border border-green-700 rounded-lg p-3">
-                  <div className="text-sm text-green-400">
-                    <strong>How it works:</strong>
-                    <ol className="list-decimal list-inside mt-2 space-y-1">
-                      <li>Enter your M-Pesa number and amount</li>
-                      <li>Minimum amount USD 10</li>
-                      <li>Click "Deposit"</li>
-                      <li>Check your phone for M-Pesa prompt</li>
-                      <li>Enter your M-Pesa PIN to complete</li>
-                    </ol>
-                  </div>
-                </div>
-
+                
                 <Button
                   type="submit"
                   disabled={isLoading || !amount || !phoneNumber}
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3"
                 >
-                  {isLoading ? "Sending STK Push..." : `Deposit $${amount}`}
+                  {isLoading ? (
+                    <span className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Processing...
+                    </span>
+                  ) : (
+                    `Deposit $${amount} USD`
+                  )}
                 </Button>
               </form>
             </CardContent>
           </Card>
         )}
 
+        {/* Card Deposit (Placeholder with full form) */}
         {depositMethod === "card" && (
           <Card className="bg-gray-800 border-gray-700">
             <CardHeader>
               <CardTitle className="text-white flex items-center">
                 <CreditCard className="w-5 h-5 mr-2 text-blue-500" />
-                Card Deposit
+                Card Payment
               </CardTitle>
-              <CardDescription className="text-gray-400">Pay with your debit or credit card</CardDescription>
+              <CardDescription className="text-gray-400">
+                Pay with your credit or debit card
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <form className="space-y-4">
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="cardNumber" className="text-white">
-                    Card Number
-                  </Label>
+                  <Label htmlFor="card-amount" className="text-white">Amount ($)</Label>
                   <Input
-                    id="cardNumber"
-                    type="text"
-                    placeholder="1234 5678 9012 3456"
-                    className="bg-gray-700 border-gray-600 text-white"
-                    maxLength={19}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="expiryDate" className="text-white">
-                      Expiry Date
-                    </Label>
-                    <Input
-                      id="expiryDate"
-                      type="text"
-                      placeholder="MM/YY"
-                      className="bg-gray-700 border-gray-600 text-white"
-                      maxLength={5}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cvv" className="text-white">
-                      CVV
-                    </Label>
-                    <Input
-                      id="cvv"
-                      type="text"
-                      placeholder="123"
-                      className="bg-gray-700 border-gray-600 text-white"
-                      maxLength={4}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="cardName" className="text-white">
-                    Cardholder Name
-                  </Label>
-                  <Input
-                    id="cardName"
-                    type="text"
-                    placeholder="John Doe"
-                    className="bg-gray-700 border-gray-600 text-white"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="cardAmount" className="text-white">
-                    Amount ($)
-                  </Label>
-                  <Input
-                    id="cardAmount"
+                    id="card-amount"
                     type="number"
-                    placeholder="Enter amount"
+                    placeholder="100"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
                     className="bg-gray-700 border-gray-600 text-white"
-                    min="1"
+                    min="100"
                   />
                 </div>
-
-                <div className="space-y-2">
-                  <Label className="text-white">Quick Amounts</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {quickAmounts.map((quickAmount) => (
-                      <Button
-                        key={quickAmount}
-                        type="button"
-                        variant="outline"
-                        size="sm"
+                
+                <div className="grid grid-cols-3 gap-2">
+                  {quickAmounts.map((amt) => (
+                    <Button
+                      key={amt}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAmount(amt.toString())}
+                      className="bg-gray-700 border-gray-600 text-white"
+                    >
+                      ${amt}
+                    </Button>
+                  ))}
+                </div>
+                
+                {/* Card Details Form */}
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="card-number" className="text-white">Card Number</Label>
+                    <Input
+                      id="card-number"
+                      type="text"
+                      placeholder="4242 4242 4242 4242"
+                      name="number"
+                      value={cardDetails.number}
+                      onChange={handleCardDetailsChange}
+                      className="bg-gray-700 border-gray-600 text-white"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="card-expiry" className="text-white">Expiry Date</Label>
+                      <Input
+                        id="card-expiry"
+                        type="text"
+                        placeholder="MM/YY"
+                        name="expiry"
+                        value={cardDetails.expiry}
+                        onChange={handleCardDetailsChange}
                         className="bg-gray-700 border-gray-600 text-white"
-                      >
-                        ${quickAmount}
-                      </Button>
-                    ))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="card-cvv" className="text-white">CVV</Label>
+                      <Input
+                        id="card-cvv"
+                        type="text"
+                        placeholder="123"
+                        name="cvv"
+                        value={cardDetails.cvv}
+                        onChange={handleCardDetailsChange}
+                        className="bg-gray-700 border-gray-600 text-white"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="card-name" className="text-white">Cardholder Name</Label>
+                    <Input
+                      id="card-name"
+                      type="text"
+                      placeholder="John Doe"
+                      name="name"
+                      value={cardDetails.name}
+                      onChange={handleCardDetailsChange}
+                      className="bg-gray-700 border-gray-600 text-white"
+                    />
                   </div>
                 </div>
-
-                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3">
-                  Pay with Card
+                
+                <div className="border border-dashed border-gray-600 rounded-lg p-6 text-center">
+                  <CreditCard className="w-10 h-10 mx-auto text-blue-400 mb-3" />
+                  <h3 className="font-medium text-white">Card Payments Coming Soon</h3>
+                  <p className="text-sm text-gray-400 mt-1">
+                    We're working to integrate secure card payments
+                  </p>
+                </div>
+                
+                <Button
+                  disabled={true}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3"
+                >
+                  Pay ${amount || '0'} USD
                 </Button>
-              </form>
+              </div>
             </CardContent>
           </Card>
         )}
 
+        {/* Bank Transfer (Placeholder) */}
         {depositMethod === "bank" && (
           <Card className="bg-gray-800 border-gray-700">
             <CardHeader>
@@ -285,31 +364,62 @@ export default function DepositPage() {
                 <Banknote className="w-5 h-5 mr-2 text-purple-500" />
                 Bank Transfer
               </CardTitle>
-              <CardDescription className="text-gray-400">Transfer money directly from your bank</CardDescription>
+              <CardDescription className="text-gray-400">
+                Transfer directly from your bank account
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8">
-                <Banknote className="w-16 h-16 mx-auto text-gray-500 mb-4" />
-                <p className="text-gray-400">Bank transfers coming soon!</p>
-                <p className="text-sm text-gray-500 mt-2">Use M-Pesa for now</p>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="bank-amount" className="text-white">Amount ($)</Label>
+                  <Input
+                    id="bank-amount"
+                    type="number"
+                    placeholder="100"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="bg-gray-700 border-gray-600 text-white"
+                    min="100"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-3 gap-2">
+                  {quickAmounts.map((amt) => (
+                    <Button
+                      key={amt}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAmount(amt.toString())}
+                      className="bg-gray-700 border-gray-600 text-white"
+                    >
+                      ${amt}
+                    </Button>
+                  ))}
+                </div>
+                
+                <div className="border border-dashed border-gray-600 rounded-lg p-6 text-center">
+                  <Banknote className="w-10 h-10 mx-auto text-purple-400 mb-3" />
+                  <h3 className="font-medium text-white">Bank Transfers Coming Soon</h3>
+                  <p className="text-sm text-gray-400 mt-1">
+                    We'll soon support direct bank transfers
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
         )}
 
+        {/* Transaction Information */}
         <Card className="bg-gray-800 border-gray-700 mt-6">
           <CardHeader>
-            <CardTitle className="text-white text-sm">Transaction Limits</CardTitle>
+            <CardTitle className="text-white text-lg">Deposit Information</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2 text-sm">
+            <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-400">Minimum deposit:</span>
-                <span className="text-white">$1</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Maximum deposit:</span>
-                <span className="text-white">$10,000</span>
+                <span className="text-white">$100</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Processing time:</span>
