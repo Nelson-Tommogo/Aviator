@@ -131,6 +131,7 @@ export default function JetWinAviator() {
 
   // Load previous multipliers from localStorage
   useEffect(() => {
+    // Load previous multipliers
     const stored = localStorage.getItem("jetcash-multipliers")
     if (stored) {
       setPreviousMultipliers(JSON.parse(stored))
@@ -140,22 +141,48 @@ export default function JetWinAviator() {
       localStorage.setItem("jetcash-multipliers", JSON.stringify(initial))
     }
 
-    // Check if admin is logged in
-    const email = localStorage.getItem("jetcash-user-email")
-    if (email) {
-      setUserEmail(email)
-      setIsAdmin(email === "admin@gmail.com")
-      // Greeting name logic
-      const namePart = email.split("@")[0]
-      setGreetingName(namePart.charAt(0).toUpperCase() + namePart.slice(1))
-      // Fetch profile
-      fetch("https://av-backend-qp7e.onrender.com/api/users/profile", {
+    // --- NEW LOGIC: Auth check and profile fetch ---
+    const token = localStorage.getItem("token")
+    if (token) {
+      fetch("https://av-backend-qp7e.onrender.com/api/auth/me", {
         method: "GET",
-        headers: { "Content-Type": "application/json", "email": email },
+        headers: { "Authorization": `Bearer ${token}` },
       })
-        .then(res => res.json())
-        .then(data => setProfile(data))
-        .catch(() => setProfile(null))
+        .then(res => {
+          if (!res.ok) throw new Error("Not authenticated")
+          return res.json()
+        })
+        .then(() => {
+          // Authenticated, now fetch profile
+          fetch("https://av-backend-qp7e.onrender.com/api/users/profile", {
+            method: "GET",
+            headers: { "Authorization": `Bearer ${token}` },
+          })
+            .then(res => res.json())
+            .then(data => {
+              setProfile(data)
+              if (data.lastname) {
+                setGreetingName(data.lastname)
+              } else {
+                setGreetingName("")
+              }
+              if (data.email) {
+                setUserEmail(data.email)
+                setIsAdmin(data.email === "admin@gmail.com")
+              }
+            })
+            .catch(() => {
+              setProfile(null)
+              setGreetingName("")
+            })
+        })
+        .catch(() => {
+          setProfile(null)
+          setGreetingName("")
+        })
+    } else {
+      setProfile(null)
+      setGreetingName("")
     }
 
     // Load music preference
@@ -841,7 +868,7 @@ export default function JetWinAviator() {
             <div className="text-2xl font-bold text-yellow-400">JetCash!</div>
             {isAdmin && <Badge className="bg-red-600 text-white">ADMIN MODE</Badge>}
             {greetingName && (
-              <span className="ml-4 text-lg text-green-400">Hi {greetingName}</span>
+              <span className="ml-4 text-lg text-green-400">Hello {greetingName}</span>
             )}
             {profile && (
               <span className="ml-4 text-sm text-gray-300">{profile.phone ? `Phone: ${profile.phone}` : ""}</span>
