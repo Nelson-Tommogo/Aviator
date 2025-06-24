@@ -868,13 +868,15 @@ export default function JetWinAviator() {
                 <span className="text-xs text-green-300 ml-1">Hello {greetingName}</span>
               )}
             </div>
-            <div className="flex items-center space-x-2">
-              <Link href="/login">
-                <Button size="sm" variant="ghost" className="p-1">
-                  <User className="w-5 h-5" />
-                </Button>
-              </Link>
-            </div>
+            {!profile && (
+              <div className="flex items-center space-x-2">
+                <Link href="/login">
+                  <Button size="sm" variant="ghost" className="p-1">
+                    <User className="w-5 h-5" />
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -913,11 +915,13 @@ export default function JetWinAviator() {
 
           <div className="flex items-center space-x-4">
             <div className="text-green-400 font-bold">${balance.toFixed(2)}</div>
-            <Link href="/login">
-              <Button size="sm" variant="ghost">
-                <User className="w-5 h-5" />
-              </Button>
-            </Link>
+            {!profile && (
+              <Link href="/login">
+                <Button size="sm" variant="ghost">
+                  <User className="w-5 h-5" />
+                </Button>
+              </Link>
+            )}
             <Link href="/deposit">
               <Button className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold">Deposit</Button>
             </Link>
