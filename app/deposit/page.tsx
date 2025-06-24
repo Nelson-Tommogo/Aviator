@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { ArrowLeft, Smartphone, CreditCard, Banknote, CheckCircle2, XCircle, Clock, RotateCw, Mail } from "lucide-react"
 import Link from "next/link"
 
-type PaymentStatus = 'idle' | 'pending' | 'success' | 'failed' | 'timeout' | 'wrong-pin'
+type PaymentStatus = 'idle' | 'pending' | 'success' | 'failed' | 'timeout' | 'wrong-pin' | 'cancelled' | 'insufficient-funds'
 
 type CardDetails = {
   number: string
@@ -45,7 +45,7 @@ export default function DepositPage() {
   }, [amount])
 
   // Check auth status
-  useEffect(() => {
+  useEffect(() => { 
     const token = localStorage.getItem("token")
     if (!token) {
       router.push("/login")
@@ -98,18 +98,34 @@ export default function DepositPage() {
       
       if (!response.ok) throw new Error(data.message || "Failed to check payment status")
 
+      // Handle different Safaricom response codes
       if (data.data?.ResultCode === "0") {
         // Payment successful
         setPaymentStatus('success')
-        saveSuccessfulDeposit()
+        await saveSuccessfulDeposit()
+      } else if (data.data?.ResultCode === "1") {
+        // Insufficient funds
+        setPaymentStatus('insufficient-funds')
       } else if (data.data?.ResultCode === "2001") {
-        // Wrong PIN
+        // Wrong PIN entered
         setPaymentStatus('wrong-pin')
+      } else if (data.data?.ResultCode === "1032") {
+        // Request cancelled by user
+        setPaymentStatus('cancelled')
       } else if (data.data?.ResultCode === "1037") {
-        // Timeout
+        // Request timeout
+        setPaymentStatus('timeout')
+      } else if (data.data?.ResultCode === "1031") {
+        // Request cancelled by user
+        setPaymentStatus('cancelled')
+      } else if (data.data?.ResultCode === "17") {
+        // Customer cancelled the request
+        setPaymentStatus('cancelled')
+      } else if (data.data?.ResultCode === "26") {
+        // Transaction stuck (timeout)
         setPaymentStatus('timeout')
       } else {
-        // Other failure
+        // Other failure cases
         setPaymentStatus('failed')
       }
     } catch (error) {
@@ -130,10 +146,11 @@ export default function DepositPage() {
         body: JSON.stringify({ 
           name,
           email,
-          phoneNumber,
+          phoneNumber: phoneNumber.replace(/\D/g, ''),
           amount: parseFloat(amount),
           currency: "USD",
-          status: "completed"
+          status: "completed",
+          method: "mpesa"
         })
       })
 
@@ -224,6 +241,104 @@ export default function DepositPage() {
     }
   }
 
+  // Test function for 1 KSH payment
+  const handleTestPayment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    // Validate name
+    if (!name.trim()) {
+      alert("Please enter your name")
+      return
+    }
+
+    // Validate email
+    if (!email.trim()) {
+      alert("Please enter your email")
+      return
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      alert("Please enter a valid email address")
+      return
+    }
+
+    // Validate and format phone number
+    const cleanedPhone = phoneNumber.replace(/\D/g, '')
+    let formattedPhone = cleanedPhone
+    
+    // Auto-correct common formats
+    if (cleanedPhone.startsWith('0') && cleanedPhone.length === 10) {
+      formattedPhone = '254' + cleanedPhone.substring(1)
+    } else if (cleanedPhone.startsWith('7') && cleanedPhone.length === 9) {
+      formattedPhone = '254' + cleanedPhone
+    } else if (!cleanedPhone.startsWith('254') || cleanedPhone.length !== 12) {
+      alert("Please enter a valid M-Pesa number (format: 254XXXXXXXXX)")
+      return
+    }
+
+    setIsLoading(true)
+    setPaymentStatus('pending')
+    setPollingCount(0)
+    const token = localStorage.getItem("token")
+    
+    try {
+      // Send 1 KSH for testing
+      const response = await fetch("https://av-backend-qp7e.onrender.com/api/stk/stk", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          phoneNumber: formattedPhone, 
+          amount: 1 // 1 KSH for testing
+        })
+      })
+
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.message || "Deposit failed")
+      }
+
+      // Save checkoutRequestID for polling
+      setCheckoutRequestID(data.checkoutRequestID)
+      
+      // Immediately save the test deposit with $0.01 equivalent
+      try {
+        const saveResponse = await fetch("https://av-backend-qp7e.onrender.com/api/deposits", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ 
+            name,
+            email,
+            phoneNumber: formattedPhone,
+            amount: 0.01, // Equivalent to 1 KSH in USD
+            currency: "USD",
+            status: "completed",
+            method: "mpesa",
+            isTest: true
+          })
+        })
+
+        if (!saveResponse.ok) {
+          console.error("Failed to save test deposit record")
+        }
+      } catch (saveError) {
+        console.error("Error saving test deposit:", saveError)
+      }
+      
+      alert("Test payment request (1 KSH) sent to your phone. Please complete the payment.")
+    } catch (error: any) {
+      setPaymentStatus('failed')
+      alert(error.message || "An error occurred. Please try again.")
+      console.error("Test deposit error:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const resetPayment = () => {
     setPaymentStatus('idle')
     setCheckoutRequestID("")
@@ -284,6 +399,28 @@ export default function DepositPage() {
             <h3 className="text-xl font-bold text-orange-500 mb-2">Incorrect PIN</h3>
             <p className="text-orange-300 mb-4">The M-Pesa PIN you entered was incorrect.</p>
             <Button onClick={resetPayment} className="bg-orange-600 hover:bg-orange-700">
+              Try Again
+            </Button>
+          </div>
+        )
+      case 'cancelled':
+        return (
+          <div className="bg-purple-900/30 border border-purple-800 rounded-lg p-6 text-center">
+            <XCircle className="w-12 h-12 mx-auto text-purple-500 mb-4" />
+            <h3 className="text-xl font-bold text-purple-500 mb-2">Payment Cancelled</h3>
+            <p className="text-purple-300 mb-4">You cancelled the payment request.</p>
+            <Button onClick={resetPayment} className="bg-purple-600 hover:bg-purple-700">
+              Try Again
+            </Button>
+          </div>
+        )
+      case 'insufficient-funds':
+        return (
+          <div className="bg-pink-900/30 border border-pink-800 rounded-lg p-6 text-center">
+            <XCircle className="w-12 h-12 mx-auto text-pink-500 mb-4" />
+            <h3 className="text-xl font-bold text-pink-500 mb-2">Insufficient Funds</h3>
+            <p className="text-pink-300 mb-4">You don't have enough funds in your M-Pesa account.</p>
+            <Button onClick={resetPayment} className="bg-pink-600 hover:bg-pink-700">
               Try Again
             </Button>
           </div>
@@ -454,6 +591,26 @@ export default function DepositPage() {
                         </span>
                       ) : (
                         `Deposit $${amount} USD`
+                      )}
+                    </Button>
+
+                    {/* TEST BUTTON - 1 KSH PAYMENT */}
+                    <Button
+                      type="button"
+                      onClick={handleTestPayment}
+                      disabled={isLoading || !phoneNumber || !name || !email}
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 mt-2"
+                    >
+                      {isLoading ? (
+                        <span className="flex items-center justify-center">
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Processing...
+                        </span>
+                      ) : (
+                        `TEST: Send 1 KSH`
                       )}
                     </Button>
                   </form>
