@@ -181,9 +181,13 @@ export default function JetWinAviator() {
                 })
                   .then(res => res.json())
                   .then(dep => {
-                    if (typeof dep.amount === "number") {
-                      setDepositAmount(dep.amount)
-                      setBalance(dep.amount)
+                    // Sum both amount and deposit if both exist
+                    let total = 0;
+                    if (typeof dep.amount === "number") total += dep.amount;
+                    if (typeof dep.deposit === "number") total += dep.deposit;
+                    if (total > 0) {
+                      setDepositAmount(total);
+                      setBalance(total);
                     }
                   })
                   .catch(() => {})
@@ -836,6 +840,39 @@ export default function JetWinAviator() {
       </svg>
     );
   };
+
+  // On mount, use localStorage balance if present
+  useEffect(() => {
+    const storedBalance = localStorage.getItem("jetcash-balance")
+    if (storedBalance && !isNaN(Number(storedBalance))) {
+      setBalance(Number(storedBalance))
+    }
+  }, [])
+
+  // Auto-logout after 10 minutes of inactivity
+  useEffect(() => {
+    let logoutTimer: NodeJS.Timeout | null = null
+    const resetTimer = () => {
+      if (logoutTimer) clearTimeout(logoutTimer)
+      logoutTimer = setTimeout(() => {
+        localStorage.clear()
+        window.location.reload()
+      }, 10 * 60 * 1000) // 10 minutes
+    }
+    // Listen for user activity
+    window.addEventListener('mousemove', resetTimer)
+    window.addEventListener('keydown', resetTimer)
+    window.addEventListener('touchstart', resetTimer)
+    window.addEventListener('scroll', resetTimer)
+    resetTimer()
+    return () => {
+      if (logoutTimer) clearTimeout(logoutTimer)
+      window.removeEventListener('mousemove', resetTimer)
+      window.removeEventListener('keydown', resetTimer)
+      window.removeEventListener('touchstart', resetTimer)
+      window.removeEventListener('scroll', resetTimer)
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">

@@ -43,6 +43,27 @@ export default function LoginPage() {
       localStorage.setItem("jetcash-user-firstname", data.user.firstname)
       localStorage.setItem("jetcash-user-lastname", data.user.lastname)
 
+      // Fetch deposit amount by email and save to localStorage
+      try {
+        const depRes = await fetch("https://av-backend-qp7e.onrender.com/api/deposits/by-email", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${data.token}`,
+          },
+          body: JSON.stringify({ email: data.user.email }),
+        })
+        const dep = await depRes.json()
+        let total = 0
+        if (typeof dep.amount === "number") total += dep.amount
+        if (typeof dep.deposit === "number") total += dep.deposit
+        if (total > 0) {
+          localStorage.setItem("jetcash-balance", total.toString())
+        }
+      } catch (e) {
+        // ignore
+      }
+
       alert("Login successful")
       window.location.href = "/"
     } catch (error) {
