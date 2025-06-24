@@ -34,7 +34,7 @@ export default function JetWinAviator() {
   const [multiplier, setMultiplier] = useState(1.0)
   const [betAmount, setBetAmount] = useState(10.5) // $10.50
   const [autoCashout, setAutoCashout] = useState(1.1)
-  const [balance, setBalance] = useState(50.75) // $50.75
+  const [balance, setBalance] = useState(0)
   const [allBets, setAllBets] = useState<Bet[]>([])
   const [previousBets, setPreviousBets] = useState<Bet[]>([])
   const [topBets, setTopBets] = useState<Bet[]>([])
@@ -57,6 +57,7 @@ export default function JetWinAviator() {
   const [maxMultiplier, setMaxMultiplier] = useState(10)
   const [profile, setProfile] = useState<any>(null)
   const [greetingName, setGreetingName] = useState("")
+  const [depositAmount, setDepositAmount] = useState<number | null>(null)
 
   const audioRef = useRef<HTMLAudioElement>(null)
   const crashAudioRef = useRef<HTMLAudioElement>(null)
@@ -169,6 +170,23 @@ export default function JetWinAviator() {
               if (data.email) {
                 setUserEmail(data.email)
                 setIsAdmin(data.email === "admin@gmail.com")
+                // Fetch deposit amount by email
+                fetch("https://av-backend-qp7e.onrender.com/api/deposits/by-email", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ email: data.email }),
+                })
+                  .then(res => res.json())
+                  .then(dep => {
+                    if (typeof dep.amount === "number") {
+                      setDepositAmount(dep.amount)
+                      setBalance(dep.amount)
+                    }
+                  })
+                  .catch(() => {})
               }
             })
             .catch(() => {
@@ -841,15 +859,16 @@ export default function JetWinAviator() {
       <header className="bg-gray-800 border-b border-gray-700 p-4 md:hidden">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Menu className="w-6 h-6" />
-            <div className="text-xl font-bold text-red-400">Aviator</div>
+            <div className="text-xl font-bold text-red-400">JetCash Aviator</div>
           </div>
           <div className="flex items-center space-x-4">
-            <div className="text-green-400 font-bold text-sm">${balance.toFixed(2)}</div>
+            <div className="text-green-400 font-bold text-sm flex items-center gap-2">
+              ${balance.toFixed(2)}
+              {greetingName && (
+                <span className="text-xs text-green-300 ml-1">Hello {greetingName}</span>
+              )}
+            </div>
             <div className="flex items-center space-x-2">
-              <Button size="sm" variant="ghost" onClick={toggleMusic} className="p-1">
-                {musicEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              </Button>
               <Link href="/login">
                 <Button size="sm" variant="ghost" className="p-1">
                   <User className="w-5 h-5" />
@@ -864,7 +883,6 @@ export default function JetWinAviator() {
       <header className="hidden md:block bg-gray-800 border-b border-gray-700">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center space-x-4">
-            <Menu className="w-6 h-6" />
             <div className="text-2xl font-bold text-yellow-400">JetCash!</div>
             {isAdmin && <Badge className="bg-red-600 text-white">ADMIN MODE</Badge>}
             {greetingName && (
@@ -895,9 +913,6 @@ export default function JetWinAviator() {
 
           <div className="flex items-center space-x-4">
             <div className="text-green-400 font-bold">${balance.toFixed(2)}</div>
-            <Button size="sm" variant="ghost" onClick={toggleMusic}>
-              {musicEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
-            </Button>
             <Link href="/login">
               <Button size="sm" variant="ghost">
                 <User className="w-5 h-5" />
