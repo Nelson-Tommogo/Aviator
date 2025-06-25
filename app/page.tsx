@@ -862,7 +862,7 @@ export default function JetWinAviator() {
             <div className="text-xl font-bold text-red-400">JetCash Aviator</div>
           </div>
           <div className="flex items-center space-x-4">
-            <div className="flex flex-col items-end">
+            <div className="flex items-center space-x-2">
               <span className="text-green-400 font-bold text-sm">${balance.toFixed(2)}</span>
               <span className="text-xs text-yellow-300 font-semibold">{greetingName}</span>
             </div>
