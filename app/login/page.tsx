@@ -65,7 +65,7 @@ export default function LoginPage() {
       }
 
       alert("Login successful")
-      window.location.href = "/"
+      window.location.href = "/" // Redirect to the main game page
     } catch (error) {
       alert("Network error. Please try again.")
     } finally {
@@ -88,9 +88,7 @@ export default function LoginPage() {
         <Card className="bg-gray-800 border-gray-700">
           <CardHeader>
             <CardTitle className="text-white">Sign In</CardTitle>
-            <CardDescription className="text-gray-400">
-              Enter your credentials to access your account
-            </CardDescription>
+            <CardDescription className="text-gray-400">Enter your credentials to access your account</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">

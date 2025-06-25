@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Volume2, VolumeX, User, Menu, Info, X } from "lucide-react"
+import { User, Info, X, LogOut } from "lucide-react"
 import Link from "next/link"
 
 interface Bet {
@@ -34,7 +34,7 @@ export default function JetWinAviator() {
   const [multiplier, setMultiplier] = useState(1.0)
   const [betAmount, setBetAmount] = useState(10.5) // $10.50
   const [autoCashout, setAutoCashout] = useState(1.1)
-  const [balance, setBalance] = useState(0)
+  const [balance, setBalance] = useState(0) // Initialize balance to 0
   const [allBets, setAllBets] = useState<Bet[]>([])
   const [previousBets, setPreviousBets] = useState<Bet[]>([])
   const [topBets, setTopBets] = useState<Bet[]>([])
@@ -53,11 +53,10 @@ export default function JetWinAviator() {
   const [audioInitialized, setAudioInitialized] = useState(false)
   const [showSoundModal, setShowSoundModal] = useState(false)
   const [showTopCashouts, setShowTopCashouts] = useState(false)
-  const [graphData, setGraphData] = useState<{x: number, y: number}[]>([])
+  const [graphData, setGraphData] = useState<{ x: number; y: number }[]>([])
   const [maxMultiplier, setMaxMultiplier] = useState(10)
   const [profile, setProfile] = useState<any>(null)
   const [greetingName, setGreetingName] = useState("")
-  const [depositAmount, setDepositAmount] = useState<number | null>(null)
 
   const audioRef = useRef<HTMLAudioElement>(null)
   const crashAudioRef = useRef<HTMLAudioElement>(null)
@@ -68,6 +67,14 @@ export default function JetWinAviator() {
   const welcomeAudioRef = useRef<HTMLAudioElement>(null)
   const flewAudioRef = useRef<HTMLAudioElement>(null)
   const gameCanvasRef = useRef<HTMLDivElement>(null)
+
+  // Function to get dynamic greeting based on time of day
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return "Good Morning"
+    if (hour < 18) return "Good Afternoon"
+    return "Good Evening"
+  }
 
   // Generate anonymous player name
   const generatePlayerName = () => {
@@ -132,7 +139,6 @@ export default function JetWinAviator() {
 
   // Load previous multipliers from localStorage
   useEffect(() => {
-    // Load previous multipliers
     const stored = localStorage.getItem("jetcash-multipliers")
     if (stored) {
       setPreviousMultipliers(JSON.parse(stored))
@@ -142,69 +148,53 @@ export default function JetWinAviator() {
       localStorage.setItem("jetcash-multipliers", JSON.stringify(initial))
     }
 
-    // --- NEW LOGIC: Auth check and profile fetch ---
-    const token = localStorage.getItem("token")
-    if (token) {
-      fetch("https://av-backend-qp7e.onrender.com/api/auth/me", {
+    // Check if admin is logged in
+    const email = localStorage.getItem("jetcash-user-email")
+    if (email) {
+      setUserEmail(email)
+      setIsAdmin(email === "admin@gmail.com")
+      // Fetch profile
+      fetch("https://av-backend-qp7e.onrender.com/api/users/profile", {
         method: "GET",
-        headers: { "Authorization": `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", email: email },
       })
-        .then(res => {
-          if (!res.ok) throw new Error("Not authenticated")
-          return res.json()
+        .then((res) => res.json())
+        .then((authData) => {
+          setProfile(authData.user) // Set the full user profile first
+
+          let display_name = "User" // Default fallback
+          if (authData.user) {
+            if (authData.user.firstname && authData.user.lastname) {
+              display_name = `${authData.user.firstname} ${authData.user.lastname}`
+            } else if (authData.user.firstname) {
+              display_name = authData.user.firstname
+            } else if (authData.user.lastname) {
+              display_name = authData.user.lastname
+            } else if (authData.user.email) {
+              // Fallback to email part if no name fields
+              display_name = authData.user.email.split("@")[0]
+            }
+          } else if (email) {
+            // If authData.user is null but email exists in local storage
+            display_name = email.split("@")[0]
+          }
+
+          setGreetingName(`${getGreeting()}, ${display_name.charAt(0).toUpperCase() + display_name.slice(1)}`)
         })
-        .then(() => {
-          // Authenticated, now fetch profile
-          fetch("https://av-backend-qp7e.onrender.com/api/users/profile", {
-            method: "GET",
-            headers: { "Authorization": `Bearer ${token}` },
-          })
-            .then(res => res.json())
-            .then(data => {
-              setProfile(data)
-              if (data.lastname) {
-                setGreetingName(data.lastname)
-              } else {
-                setGreetingName("")
-              }
-              if (data.email) {
-                setUserEmail(data.email)
-                setIsAdmin(data.email === "admin@gmail.com")
-                // Fetch deposit amount by email
-                fetch("https://av-backend-qp7e.onrender.com/api/deposits/by-email", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`,
-                  },
-                  body: JSON.stringify({ email: data.email }),
-                })
-                  .then(res => res.json())
-                  .then(dep => {
-                    // Sum both amount and deposit if both exist
-                    let total = 0;
-                    if (typeof dep.amount === "number") total += dep.amount;
-                    if (typeof dep.deposit === "number") total += dep.deposit;
-                    if (total > 0) {
-                      setDepositAmount(total);
-                      setBalance(total);
-                    }
-                  })
-                  .catch(() => {})
-              }
-            })
-            .catch(() => {
-              setProfile(null)
-              setGreetingName("")
-            })
-        })
-        .catch(() => {
+        .catch((error) => {
+          console.error("Error fetching profile:", error)
           setProfile(null)
-          setGreetingName("")
+          // If profile fetch fails, still try to set greeting from local storage email
+          if (email) {
+            const namePart = email.split("@")[0]
+            setGreetingName(`${getGreeting()}, ${namePart.charAt(0).toUpperCase() + namePart.slice(1)}`)
+          } else {
+            setGreetingName(`${getGreeting()}, Guest`)
+          }
         })
     } else {
-      setProfile(null)
-      setGreetingName("")
+      // If no email in local storage, set a generic greeting
+      setGreetingName(`${getGreeting()}, Guest`)
     }
 
     // Load music preference
@@ -227,6 +217,29 @@ export default function JetWinAviator() {
     })
 
     setTimeout(initializeAudio, 2000)
+
+    // Fetch deposit amount
+    const token = localStorage.getItem("token")
+    const emailToFetch = localStorage.getItem("jetcash-user-email")
+
+    fetch(`https://av-backend-qp7e.onrender.com/api/deposits/by-email?email=${emailToFetch}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then((res) => res.json())
+      .then((deposits) => {
+        let totalAmount = 0
+        if (Array.isArray(deposits)) {
+          totalAmount = deposits.reduce((sum, deposit) => sum + (deposit.amount || 0), 0)
+        }
+        if (totalAmount > 0) {
+          setBalance(totalAmount)
+        } else {
+          setBalance(0) // Ensure balance is 0 if no deposits or an empty array is returned
+        }
+      })
 
     return () => {
       events.forEach((event) => {
@@ -620,10 +633,7 @@ export default function JetWinAviator() {
       currentMultiplier += increment
       // Update state together for perfect sync
       setMultiplier(currentMultiplier)
-      setGraphData(prev => [
-        ...prev,
-        { x: currentMultiplier, y: currentMultiplier }
-      ])
+      setGraphData((prev) => [...prev, { x: currentMultiplier, y: currentMultiplier }])
       // 🤖 Check auto cash-out
       handleAutoCashOut(currentMultiplier)
       // 💥 Check crash condition
@@ -784,37 +794,44 @@ export default function JetWinAviator() {
     return "bg-blue-500 text-white"
   }
 
-  const FlightGraph = ({ data, currentMultiplier }: { data: {x: number, y: number}[], currentMultiplier: number }) => {
+  const FlightGraph = ({
+    data,
+    currentMultiplier,
+  }: { data: { x: number; y: number }[]; currentMultiplier: number }) => {
     // Use the same positioning logic as the plane
     const getPlanePosition = (mult: number) => {
-      const baseLeft = Math.min(85, 2 + (mult - 1) * 12);
-      const baseBottom = Math.min(80, 2 + (mult - 1) * 10);
-      const fastOscillation = Math.sin(mult * 3) * 8;
-      const quickVariation = Math.cos(mult * 2.5) * 5;
-      const dramaticMove = 0; // Don't use random for graph
-      const finalLeft = Math.max(2, Math.min(85, baseLeft + fastOscillation + dramaticMove));
-      const finalBottom = Math.max(2, Math.min(80, baseBottom + quickVariation));
-      return { left: finalLeft, bottom: finalBottom };
-    };
+      const baseLeft = Math.min(85, 2 + (mult - 1) * 12)
+      const baseBottom = Math.min(80, 2 + (mult - 1) * 10)
+      const fastOscillation = Math.sin(mult * 3) * 8
+      const quickVariation = Math.cos(mult * 2.5) * 5
+      const dramaticMove = 0 // Don't use random for graph
+      const finalLeft = Math.max(2, Math.min(85, baseLeft + fastOscillation + dramaticMove))
+      const finalBottom = Math.max(2, Math.min(80, baseBottom + quickVariation))
+      return { left: finalLeft, bottom: finalBottom }
+    }
     // Convert percentage positions to SVG coordinates
-    const points = data.map(point => {
-      const pos = getPlanePosition(point.x);
+    const points = data.map((point) => {
+      const pos = getPlanePosition(point.x)
       return {
         x: pos.left,
-        y: 100 - pos.bottom // Flip Y-axis for SVG
-      };
-    });
-    const currentPos = getPlanePosition(currentMultiplier);
+        y: 100 - pos.bottom, // Flip Y-axis for SVG
+      }
+    })
+    const currentPos = getPlanePosition(currentMultiplier)
     const currentPoint = {
       x: currentPos.left,
-      y: 100 - currentPos.bottom
-    };
+      y: 100 - currentPos.bottom,
+    }
     // Build path data
-    const pathData = points.length > 0
-      ? `M ${points[0].x} ${points[0].y} ` + 
-        points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ') + 
-        ` L ${currentPoint.x} ${currentPoint.y}`
-      : '';
+    const pathData =
+      points.length > 0
+        ? `M ${points[0].x} ${points[0].y} ` +
+          points
+            .slice(1)
+            .map((p) => `L ${p.x} ${p.y}`)
+            .join(" ") +
+          ` L ${currentPoint.x} ${currentPoint.y}`
+        : ""
     return (
       <svg
         viewBox="0 0 100 100"
@@ -822,57 +839,22 @@ export default function JetWinAviator() {
         className="absolute inset-0 w-full h-full pointer-events-none"
         style={{ zIndex: 9 }}
       >
-        <path
-          d={pathData}
-          stroke="#10B981"
-          strokeWidth="0.5"
-          fill="none"
-          strokeLinecap="round"
-        />
-        {gameState === "flying" && (
-          <circle
-            cx={currentPoint.x}
-            cy={currentPoint.y}
-            r="1"
-            fill="#10B981"
-          />
-        )}
+        <path d={pathData} stroke="#10B981" strokeWidth="0.5" fill="none" strokeLinecap="round" />
+        {gameState === "flying" && <circle cx={currentPoint.x} cy={currentPoint.y} r="1" fill="#10B981" />}
       </svg>
-    );
-  };
+    )
+  }
 
-  // On mount, use localStorage balance if present
-  useEffect(() => {
-    const storedBalance = localStorage.getItem("jetcash-balance")
-    if (storedBalance && !isNaN(Number(storedBalance))) {
-      setBalance(Number(storedBalance))
-    }
-  }, [])
-
-  // Auto-logout after 10 minutes of inactivity
-  useEffect(() => {
-    let logoutTimer: NodeJS.Timeout | null = null
-    const resetTimer = () => {
-      if (logoutTimer) clearTimeout(logoutTimer)
-      logoutTimer = setTimeout(() => {
-        localStorage.clear()
-        window.location.reload()
-      }, 10 * 60 * 1000) // 10 minutes
-    }
-    // Listen for user activity
-    window.addEventListener('mousemove', resetTimer)
-    window.addEventListener('keydown', resetTimer)
-    window.addEventListener('touchstart', resetTimer)
-    window.addEventListener('scroll', resetTimer)
-    resetTimer()
-    return () => {
-      if (logoutTimer) clearTimeout(logoutTimer)
-      window.removeEventListener('mousemove', resetTimer)
-      window.removeEventListener('keydown', resetTimer)
-      window.removeEventListener('touchstart', resetTimer)
-      window.removeEventListener('scroll', resetTimer)
-    }
-  }, [])
+  const handleLogout = () => {
+    localStorage.removeItem("token")
+    localStorage.removeItem("jetcash-user")
+    localStorage.removeItem("jetcash-user-id")
+    localStorage.removeItem("jetcash-user-email")
+    localStorage.removeItem("jetcash-user-phone")
+    localStorage.removeItem("jetcash-user-firstname")
+    localStorage.removeItem("jetcash-user-lastname")
+    window.location.href = "/login"
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
@@ -901,19 +883,26 @@ export default function JetWinAviator() {
           <div className="flex items-center space-x-4">
             <div className="text-green-400 font-bold text-sm flex items-center gap-2">
               ${balance.toFixed(2)}
-              {greetingName && (
-                <span className="text-xs text-green-300 ml-1">Hello {greetingName}</span>
+              {profile && (
+                <span className="text-xs text-green-300 ml-1">
+                  {greetingName}
+                  {profile.phone && ` | ${profile.phone}`}
+                </span>
               )}
             </div>
-            {!profile && (
-              <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2">
+              {profile ? (
+                <Button size="sm" variant="ghost" className="p-1" onClick={handleLogout}>
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              ) : (
                 <Link href="/login">
                   <Button size="sm" variant="ghost" className="p-1">
                     <User className="w-5 h-5" />
                   </Button>
                 </Link>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -924,9 +913,7 @@ export default function JetWinAviator() {
           <div className="flex items-center space-x-4">
             <div className="text-2xl font-bold text-yellow-400">JetCash!</div>
             {isAdmin && <Badge className="bg-red-600 text-white">ADMIN MODE</Badge>}
-            {greetingName && (
-              <span className="ml-4 text-lg text-green-400">Hello {greetingName}</span>
-            )}
+            {profile && <span className="ml-4 text-lg text-green-400">{greetingName}</span>}
             {profile && (
               <span className="ml-4 text-sm text-gray-300">{profile.phone ? `Phone: ${profile.phone}` : ""}</span>
             )}
@@ -952,14 +939,18 @@ export default function JetWinAviator() {
 
           <div className="flex items-center space-x-4">
             <div className="text-green-400 font-bold">${balance.toFixed(2)}</div>
-            {!profile && (
+            {profile ? (
+              <Button size="sm" variant="ghost" onClick={handleLogout}>
+                <LogOut className="w-5 h-5" />
+              </Button>
+            ) : (
               <Link href="/login">
                 <Button size="sm" variant="ghost">
                   <User className="w-5 h-5" />
                 </Button>
               </Link>
             )}
-            <Link href="/deposit">
+            <Link href={profile ? "/deposit" : "/login"}>
               <Button className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold">Deposit</Button>
             </Link>
           </div>
@@ -1062,10 +1053,10 @@ export default function JetWinAviator() {
             className="relative h-64 md:h-96 overflow-hidden flex-shrink-0"
             style={{
               background: `
-                radial-gradient(ellipse at center, rgba(0,0,0,0.95) 0%, rgba(16,33,62,0.9) 20%, rgba(15,52,96,0.8) 40%, rgba(83,52,131,0.7) 60%, rgba(114,9,183,0.6) 80%, rgba(147,51,234,0.5) 100%),
-                linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.03) 50%, transparent 70%),
-                linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.02) 50%, transparent 60%)
-              `,
+          radial-gradient(ellipse at center, rgba(0,0,0,0.95) 0%, rgba(16,33,62,0.9) 20%, rgba(15,52,96,0.8) 40%, rgba(83,52,131,0.7) 60%, rgba(114,9,183,0.6) 80%, rgba(147,51,234,0.5) 100%),
+          linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.03) 50%, transparent 70%),
+          linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.02) 50%, transparent 60%)
+        `,
               backgroundSize: "100% 100%, 100px 100px, 80px 80px",
               animation: gameState === "flying" ? "moveBackground 2s linear infinite" : "none", // Faster background
             }}
@@ -1178,12 +1169,7 @@ export default function JetWinAviator() {
             </div>
 
             {/* Add this for the graph */}
-            {gameState === "flying" && (
-              <FlightGraph 
-                data={graphData} 
-                currentMultiplier={multiplier} 
-              />
-            )}
+            {gameState === "flying" && <FlightGraph data={graphData} currentMultiplier={multiplier} />}
           </div>
 
           {/* Single Betting Panel */}
@@ -1414,7 +1400,10 @@ export default function JetWinAviator() {
       </div>
 
       {/* Mobile Cashout History with Top Results button */}
-      <div className="md:hidden bg-gray-900 p-3 flex-1 overflow-y-auto" style={{ height: 'calc(100vh - 64px - 200px)' }}>
+      <div
+        className="md:hidden bg-gray-900 p-3 flex-1 overflow-y-auto"
+        style={{ height: "calc(100vh - 64px - 200px)" }}
+      >
         <div className="flex items-center justify-between mb-2">
           <div className="text-sm font-semibold text-white">Cashout History</div>
           <Button
@@ -1445,9 +1434,7 @@ export default function JetWinAviator() {
                 <div className="text-xs text-gray-300 mb-1">Bet: ${cashout.amount.toFixed(2)}</div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold text-green-400">{cashout.multiplier.toFixed(2)}x</span>
-                  <span className="text-sm font-bold text-yellow-400">
-                    +${cashout.winAmount.toFixed(2)}
-                  </span>
+                  <span className="text-sm font-bold text-yellow-400">+${cashout.winAmount.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -1464,7 +1451,7 @@ export default function JetWinAviator() {
 
       {/* Mobile Deposit Button */}
       <div className="md:hidden fixed bottom-4 right-4">
-        <Link href="/deposit">
+        <Link href={profile ? "/deposit" : "/login"}>
           <Button className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-6 py-3 rounded-full shadow-lg">
             Deposit
           </Button>
@@ -1496,6 +1483,7 @@ export default function JetWinAviator() {
                   setMusicEnabled(false)
                   if (welcomeAudioRef.current) {
                     welcomeAudioRef.current.muted = true
+                    welcomeAudioRef.current.pause() // Pause if muted
                   }
                   setShowSoundModal(false)
                 }}
@@ -1504,10 +1492,11 @@ export default function JetWinAviator() {
                 No
               </Button>
               <Button
-                onClick={() => {
-                  setMusicEnabled(true)
+                onClick={async () => {
+                  setMusicEnabled(true) // Default is usually on
                   if (welcomeAudioRef.current) {
                     welcomeAudioRef.current.muted = false
+                    await welcomeAudioRef.current.play()
                   }
                   setShowSoundModal(false)
                 }}
@@ -1521,65 +1510,65 @@ export default function JetWinAviator() {
       )}
 
       <style jsx>{`
-        @keyframes moveBackground {
-          0% {
-            background-position: 0 0, 0 0, 0 0;
-          }
-          100% {
-            background-position: 0 0, 100px 100px, -80px 80px;
-          }
-        }
+  @keyframes moveBackground {
+    0% {
+      background-position: 0 0, 0 0, 0 0;
+    }
+    100% {
+      background-position: 0 0, 100px 100px, -80px 80px;
+    }
+  }
 
-        @keyframes planeGlow {
-          0% {
-            filter: brightness(1.3) drop-shadow(0 0 5px rgba(255,255,255,0.5));
-          }
-          100% {
-            filter: brightness(1.5) drop-shadow(0 0 15px rgba(255,255,255,0.8));
-          }
-        }
+  @keyframes planeGlow {
+    0% {
+      filter: brightness(1.3) drop-shadow(0 0 5px rgba(255,255,255,0.5));
+    }
+    100% {
+      filter: brightness(1.5) drop-shadow(0 0 15px rgba(255,255,255,0.8));
+    }
+  }
 
-        @keyframes multiplierPulse {
-          0% {
-            text-shadow: 0 0 20px rgba(255,255,255,0.5);
-            transform: scale(1);
-          }
-          100% {
-            text-shadow: 0 0 30px rgba(255,255,255,0.8);
-            transform: scale(1.05);
-          }
-        }
+  @keyframes multiplierPulse {
+    0% {
+      text-shadow: 0 0 20px rgba(255,255,255,0.5);
+      transform: scale(1);
+    }
+    100% {
+      text-shadow: 0 0 30px rgba(255,255,255,0.8);
+      transform: scale(1.05);
+    }
+  }
 
-        /* 🛤️ ANIMATED DOTTED TRAIL */
-        @keyframes dashMove {
-          0% {
-            stroke-dashoffset: 0;
-          }
-          100% {
-            stroke-dashoffset: 12;
-          }
-        }
+  /* 🛤️ ANIMATED DOTTED TRAIL */
+  @keyframes dashMove {
+    0% {
+      stroke-dashoffset: 0;
+    }
+    100% {
+      stroke-dashoffset: 12;
+    }
+  }
 
-        /* 🪢 SWINGING MULTIPLIER TAG */
-        @keyframes multiplierSwing {
-          0%, 100% {
-            transform: translateX(-50%) rotate(-2deg);
-          }
-          50% {
-            transform: translateX(-50%) rotate(2deg);
-          }
-        }
+  /* 🪢 SWINGING MULTIPLIER TAG */
+  @keyframes multiplierSwing {
+    0%, 100% {
+      transform: translateX(-50%) rotate(-2deg);
+    }
+    50% {
+      transform: translateX(-50%) rotate(2deg);
+    }
+  }
 
-        @keyframes graphFadeIn {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .flight-graph {
-          animation: graphFadeIn 0.5s ease-out;
-          z-index: 10;
-          box-shadow: 0 0 10px rgba(0,0,0,0.5);
-        }
-      `}</style>
+  @keyframes graphFadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .flight-graph {
+    animation: graphFadeIn 0.5s ease-out;
+    z-index: 10;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  }
+`}</style>
     </div>
   )
 }
