@@ -351,7 +351,7 @@ export default function JetWinAviator() {
       const avatar = avatars[Math.floor(Math.random() * avatars.length)]
       const amount = generateDynamicBetAmount() // Ensure >= 100
       // Use recent multipliers for more realistic history
-      const multiplier = i < recentMultipliers.length ? recentMultipliers[i] : Math.random() * 50 + 1.1
+      const multiplier = i < recentMultipliers.length ? recentMultipliers[i] : Math.random() * 100 + 1.1
       const winAmount = amount * multiplier
 
       cashouts.push({
@@ -1022,7 +1022,7 @@ export default function JetWinAviator() {
       <header className="bg-gray-800 border-b border-gray-700 p-4 md:hidden">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <div className="text-xl font-bold text-red-400">JetCash Aviator</div>
+            <div className="text-xl font-bold text-red-400">JetCash</div>
           </div>
           <div className="flex items-center space-x-2">
             <span className="text-xs text-yellow-300 font-semibold">{greetingName}</span>
