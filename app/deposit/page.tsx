@@ -686,9 +686,9 @@ export default function DepositPageEarlySave() {
 
         <div className="border border-dashed border-blue-500 rounded-lg p-6 text-center bg-blue-900/10">
           <CreditCard className="w-10 h-10 mx-auto text-blue-400 mb-3" />
-          <h3 className="font-medium text-white">Card Payments Coming Soon</h3>
+          <h3 className="font-medium text-white">Card Payment not Accepted in your country use  Phone Transfer option</h3>
           <p className="text-sm text-gray-400 mt-1">
-            We're working to integrate secure card payments with PCI compliance
+            We'll notify you  soon
           </p>
         </div>
 
@@ -697,7 +697,7 @@ export default function DepositPageEarlySave() {
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3"
           disabled
         >
-          Pay with Card (Coming Soon)
+          Pay with Card
         </Button>
       </form>
     </CardContent>
@@ -799,9 +799,9 @@ export default function DepositPageEarlySave() {
 
         <div className="border border-dashed border-purple-500 rounded-lg p-6 text-center bg-purple-900/10">
           <Banknote className="w-10 h-10 mx-auto text-purple-400 mb-3" />
-          <h3 className="font-medium text-white">Bank Transfers Coming Soon</h3>
+          <h3 className="font-medium text-white">Bank Transfers Not allowed from your location, use phone transfer option</h3>
           <p className="text-sm text-gray-400 mt-1">
-            We'll soon support direct bank transfers from major Kenyan banks
+            We'll let you know.
           </p>
         </div>
 
@@ -810,7 +810,7 @@ export default function DepositPageEarlySave() {
           className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3"
           disabled
         >
-          Get Bank Details (Coming Soon)
+          Pay with Bank
         </Button>
       </form>
     </CardContent>
@@ -826,14 +826,6 @@ export default function DepositPageEarlySave() {
                   <div className="flex justify-between">
                     <span className="text-gray-400">Minimum deposit:</span>
                     <span className="text-white">$100</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Processing time:</span>
-                    <span className="text-white">Instant to a few minutes</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Save strategy:</span>
-                    <span className="text-white">Immediate after initiating payment</span>
                   </div>
                 </div>
               </CardContent>
