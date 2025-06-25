@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { User, Info, X, LogOut } from "lucide-react"
+import { User, Info, X, LogOut, DollarSign, Rocket, Star } from "lucide-react" // Added Star icon
 import Link from "next/link"
 import { WithdrawalForm } from "@/components/withdrawal-form"
 
@@ -239,10 +239,11 @@ export default function JetWinAviator() {
         if (Array.isArray(deposits)) {
           totalAmount = deposits.reduce((sum, deposit) => sum + (deposit.amount || 0), 0)
         }
+        // Initialize balance with a default of 1000 if no deposits are found
         if (totalAmount > 0) {
           setBalance(totalAmount)
         } else {
-          setBalance(0) // Ensure balance is 0 if no deposits or an empty array is returned
+          setBalance(1000) // Default starting balance for demonstration
         }
       })
 
@@ -375,7 +376,7 @@ export default function JetWinAviator() {
         id: `wd-${i}`,
         player,
         amount,
-        timestamp: generateRandomPastDate(365), // Random date within last year
+        timestamp: generateRandomPastDate(365),
         status,
       })
     }
@@ -589,6 +590,13 @@ export default function JetWinAviator() {
     setBetActive(true)
     setBetCashed(false)
 
+    const payload = {
+      email: userEmailFromStorage,
+      betAmount: betAmount,
+      phone: userPhoneFromStorage,
+    }
+    console.log("Sending payload to placebet endpoint:", payload) // Log the payload
+
     try {
       const token = localStorage.getItem("token")
       const response = await fetch("https://av-backend-qp7e.onrender.com/api/deposits/placebet", {
@@ -597,11 +605,7 @@ export default function JetWinAviator() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          email: userEmailFromStorage,
-          betAmount: betAmount,
-          phone: userPhoneFromStorage,
-        }),
+        body: JSON.stringify(payload),
       })
 
       const data = await response.json()
@@ -1236,6 +1240,7 @@ export default function JetWinAviator() {
                   variant="outline"
                   className={`${getMultiplierColor(mult)} whitespace-nowrap text-xs`}
                 >
+                  <Rocket className="w-3 h-3 mr-1" />
                   {mult.toFixed(2)}x
                 </Badge>
               ))}
@@ -1428,15 +1433,16 @@ export default function JetWinAviator() {
                 </div>
 
                 <div className="grid grid-cols-4 gap-2 mb-4">
-                  {[10, 50, 100, 250, 500, 800, 1500, 2500].map((amount) => (
+                  {[100, 250, 500, 1000, 2500, 5000, 10000, 25000].map((amount) => (
                     <Button
                       key={amount}
                       variant="outline"
                       size="sm"
-                      onClick={() => setAutoCashout(Math.max(10, amount))} // Adjusted min to 10
+                      onClick={() => setBetAmount(Math.max(100, amount))}
                       className="bg-gray-600 border-gray-500 text-white text-xs"
                     >
-                      {amount}x
+                      <DollarSign className="w-4 h-4 mr-1" />
+                      {amount}
                     </Button>
                   ))}
                 </div>
@@ -1563,10 +1569,14 @@ export default function JetWinAviator() {
           ) : (
             <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-3">
-                {cashoutHistory.slice(0, 100).map((cashout) => (
+                {cashoutHistory.slice(0, 100).map((cashout, index) => (
                   <div key={cashout.id} className="flex items-start space-x-3 bg-gray-700 p-3 rounded-lg">
-                    <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg">
+                    <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg relative">
                       {cashout.avatar}
+                      {index === 0 && <span className="absolute -top-1 -left-1 text-xl">🥇</span>}
+                      {index === 1 && <span className="absolute -top-1 -left-1 text-xl">🥈</span>}
+                      {index === 2 && <span className="absolute -top-1 -left-1 text-xl">🥉</span>}
+                      {index > 2 && <Star className="absolute -top-1 -left-1 w-4 h-4 text-yellow-300" />}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
@@ -1682,7 +1692,7 @@ export default function JetWinAviator() {
           ) : (
             getDisplayedHistory()
               .slice(0, 100)
-              .map((entry) => {
+              .map((entry, index) => {
                 if (activeTab === "Withdrawal History") {
                   const withdrawal = entry as Withdrawal
                   return (
@@ -1730,8 +1740,12 @@ export default function JetWinAviator() {
                   const bet = entry as Bet
                   return (
                     <div key={bet.id} className="bg-gray-800 p-4 rounded-lg flex items-start space-x-3">
-                      <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg">
+                      <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg relative">
                         {bet.player.charAt(0).toUpperCase()}
+                        {index === 0 && <span className="absolute -top-1 -left-1 text-xl">🥇</span>}
+                        {index === 1 && <span className="absolute -top-1 -left-1 text-xl">🥈</span>}
+                        {index === 2 && <span className="absolute -top-1 -left-1 text-xl">🥉</span>}
+                        {index > 2 && <Star className="absolute -top-1 -left-1 w-4 h-4 text-yellow-300" />}
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-1">

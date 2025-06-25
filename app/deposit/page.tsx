@@ -53,7 +53,6 @@ export default function DepositPageEarlySave() {
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [depositMethod, setDepositMethod] = useState("mpesa")
-  const [kshAmount, setKshAmount] = useState(0)
   const [checkoutRequestID, setCheckoutRequestID] = useState("")
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("idle")
   const [pollingCount, setPollingCount] = useState(0)
@@ -66,12 +65,6 @@ export default function DepositPageEarlySave() {
     name: "",
   })
   const router = useRouter()
-
-  // Convert USD to KSH in real-time
-  useEffect(() => {
-    const amountNum = Number.parseFloat(amount) || 0
-    setKshAmount(Math.round(amountNum * 130))
-  }, [amount])
 
   // Check auth status
   useEffect(() => {
@@ -95,7 +88,7 @@ export default function DepositPageEarlySave() {
     }
   }, [router])
 
-  // Poll payment status if pending
+  // Poll payment status if pending - now reduced to 45 seconds (9 attempts)
   useEffect(() => {
     let interval: NodeJS.Timeout;
 
@@ -105,11 +98,10 @@ export default function DepositPageEarlySave() {
         setPollingCount((prev) => prev + 1)
       }, 5000) // Check every 5 seconds
 
-      // Stop polling after 12 attempts (60 seconds)
-      if (pollingCount >= 12) {
+      // Stop polling after 9 attempts (45 seconds)
+      if (pollingCount >= 9) {
         clearInterval(interval)
         setPaymentStatus("timeout")
-        updateDepositStatus("timeout", null, "Payment verification timeout")
       }
     }
 
@@ -123,42 +115,34 @@ export default function DepositPageEarlySave() {
     switch (code) {
       case "0":
         setPaymentStatus("success")
-        updateDepositStatus("completed", data)
+        saveSuccessfulDeposit(data)
         break
       case "1":
         setPaymentStatus("pending")
         break
       case "2":
         setPaymentStatus("timeout")
-        updateDepositStatus("timeout", data, "Payment timeout")
         break
       case "1032":
         setPaymentStatus("cancelled")
-        updateDepositStatus("cancelled", data, "Payment cancelled by user")
         break
       case "1031":
         setPaymentStatus("user-not-found")
-        updateDepositStatus("failed", data, "User not found/not an M-Pesa user")
         break
       case "1033":
         setPaymentStatus("insufficient-funds")
-        updateDepositStatus("failed", data, "Insufficient funds")
         break
       case "17":
         setPaymentStatus("cancelled")
-        updateDepositStatus("cancelled", data, "Payment declined by user")
         break
       case "20":
         setPaymentStatus("service-unavailable")
-        updateDepositStatus("failed", data, "Service not available")
         break
       case "2001":
         setPaymentStatus("wrong-pin")
-        updateDepositStatus("failed", data, "Wrong PIN entered")
         break
       default:
         setPaymentStatus("failed")
-        updateDepositStatus("failed", data, `Payment failed with code: ${code}`)
     }
   }
 
@@ -179,8 +163,8 @@ export default function DepositPageEarlySave() {
 
       if (!response.ok) {
         console.error("STK Query API Error:", data)
-        if (pollingCount >= 10) {
-          throw new Error(data.message || "Failed to check payment status")
+        if (pollingCount >= 9) {
+          setPaymentStatus("failed")
         }
         return
       }
@@ -191,15 +175,14 @@ export default function DepositPageEarlySave() {
       }
     } catch (error) {
       console.error("Error checking payment status:", error)
-      if (pollingCount >= 10) {
+      if (pollingCount >= 9) {
         setPaymentStatus("failed")
-        updateDepositStatus("failed", null, "Error checking payment status")
       }
     }
   }
 
-  // Save transaction immediately after STK push is initiated
-  const saveInitialDeposit = async (checkoutRequestId: string) => {
+  // Save successful transaction
+  const saveSuccessfulDeposit = async (transactionData: STKResponseData) => {
     try {
       const token = localStorage.getItem("token")
       const response = await fetch("https://av-backend-qp7e.onrender.com/api/deposits", {
@@ -214,9 +197,11 @@ export default function DepositPageEarlySave() {
           phone: phoneNumber.replace(/\D/g, ""),
           amount: Number.parseFloat(amount),
           currency: "USD",
-          status: "pending", 
+          status: "completed",
           method: "mpesa",
-          checkoutRequestId,
+          transactionId: transactionData.MpesaReceiptNumber || checkoutRequestID,
+          mpesaData: transactionData,
+          completedAt: new Date().toISOString(),
         }),
       })
 
@@ -227,37 +212,8 @@ export default function DepositPageEarlySave() {
       setDepositId(result.id || result._id)
       return result
     } catch (error) {
-      console.error("Error saving initial deposit:", error)
+      console.error("Error saving successful deposit:", error)
       throw error
-    }
-  }
-
-  // Update deposit status in DB
-  const updateDepositStatus = async (
-    status: string,
-    transactionData: STKResponseData | null = null,
-    failureReason?: string
-  ) => {
-    if (!depositId) return
-
-    try {
-      const token = localStorage.getItem("token")
-      await fetch(`https://av-backend-qp7e.onrender.com/api/deposits/${depositId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          status,
-          transactionId: transactionData?.MpesaReceiptNumber || checkoutRequestID,
-          mpesaData: transactionData,
-          failureReason,
-          completedAt: status === "completed" ? new Date().toISOString() : null,
-        }),
-      })
-    } catch (error) {
-      console.error("Error updating deposit status:", error)
     }
   }
 
@@ -303,7 +259,7 @@ export default function DepositPageEarlySave() {
         },
         body: JSON.stringify({
           phoneNumber: formattedPhone,
-          amount: kshAmount,
+          amount: Math.round(amountNum * 130), // Convert to KSH internally
         }),
       })
 
@@ -312,7 +268,6 @@ export default function DepositPageEarlySave() {
 
       if (data.checkoutRequestID) {
         setCheckoutRequestID(data.checkoutRequestID)
-        await saveInitialDeposit(data.checkoutRequestID)
         setPaymentStatus("pending")
       } else {
         throw new Error("No checkout request ID received")
@@ -351,7 +306,7 @@ export default function DepositPageEarlySave() {
         case "success":
           return {
             title: "Payment Successful!",
-            message: `Your deposit of $${amount} has been completed. M-Pesa receipt: ${transactionDetails?.MpesaReceiptNumber || "N/A"}`,
+            message: `Your deposit of $${amount} has been completed.`,
             icon: <CheckCircle2 className="w-12 h-12 mx-auto text-green-500" />,
             color: "green",
             action: () => router.push("/")
@@ -399,7 +354,7 @@ export default function DepositPageEarlySave() {
         case "insufficient-funds":
           return {
             title: "Insufficient Funds",
-            message: "Your M-Pesa account has insufficient funds to complete this payment.",
+            message: "Your account has insufficient funds to complete this payment.",
             icon: <XCircle className="w-12 h-12 mx-auto text-red-500" />,
             color: "red",
             action: resetPayment
@@ -407,7 +362,7 @@ export default function DepositPageEarlySave() {
         case "user-not-found":
           return {
             title: "User Not Found",
-            message: "The phone number is not registered with M-Pesa. Please check and try again.",
+            message: "The phone number is not registered. Please check and try again.",
             icon: <XCircle className="w-12 h-12 mx-auto text-red-500" />,
             color: "red",
             action: resetPayment
@@ -415,7 +370,7 @@ export default function DepositPageEarlySave() {
         case "service-unavailable":
           return {
             title: "Service Unavailable",
-            message: "M-Pesa services are temporarily unavailable. Please try again later.",
+            message: "Payment services are temporarily unavailable. Please try again later.",
             icon: <XCircle className="w-12 h-12 mx-auto text-red-500" />,
             color: "red",
             action: resetPayment
@@ -444,16 +399,6 @@ export default function DepositPageEarlySave() {
         <p className={`text-${status.color}-300 mb-4`}>
           {status.message}
         </p>
-        {transactionDetails?.Amount && (
-          <p className="text-white mb-2">
-            Amount: KES {transactionDetails.Amount.toLocaleString()}
-          </p>
-        )}
-        {transactionDetails?.TransactionDate && (
-          <p className="text-gray-400 text-sm">
-            {new Date(transactionDetails.TransactionDate).toLocaleString()}
-          </p>
-        )}
         <Button 
           onClick={status.action}
           className={`bg-${status.color}-600 hover:bg-${status.color}-700 mt-4`}
@@ -473,7 +418,7 @@ export default function DepositPageEarlySave() {
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Game
           </Link>
           <h1 className="text-2xl font-bold text-yellow-400">Deposit Funds</h1>
-          <p className="text-gray-400 mt-2">Transactions are saved immediately after initiating payment</p>
+          <p className="text-gray-400 mt-2">Transactions are processed immediately</p>
         </div>
 
         {/* Show payment status or form */}
@@ -518,7 +463,7 @@ export default function DepositPageEarlySave() {
                     M-Pesa Deposit
                   </CardTitle>
                   <CardDescription className="text-gray-400">
-                    Transactions are saved immediately after initiating payment
+                    Complete payment on your phone
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -566,7 +511,6 @@ export default function DepositPageEarlySave() {
                         className="bg-gray-700 border-gray-600 text-white"
                         required
                       />
-                      <p className="text-xs text-gray-400">Format: 2547XXXXXXXX</p>
                     </div>
 
                     <div className="space-y-2">
@@ -583,7 +527,6 @@ export default function DepositPageEarlySave() {
                         min="100"
                         required
                       />
-                      <p className="text-xs text-gray-400">KES {kshAmount.toLocaleString()}</p>
                     </div>
 
                     <div className="grid grid-cols-3 gap-2">
@@ -712,7 +655,6 @@ export default function DepositPageEarlySave() {
                         min="100"
                         disabled
                       />
-                      <p className="text-xs text-gray-400">KES {kshAmount.toLocaleString()}</p>
                     </div>
 
                     <div className="grid grid-cols-3 gap-2">
@@ -733,9 +675,9 @@ export default function DepositPageEarlySave() {
 
                     <div className="border border-dashed border-blue-500 rounded-lg p-6 text-center bg-blue-900/10">
                       <CreditCard className="w-10 h-10 mx-auto text-blue-400 mb-3" />
-                      <h3 className="font-medium text-white">Card Payment not Accepted in your country use Phone Transfer option</h3>
+                      <h3 className="font-medium text-white">Card Payment not Accepted in your country</h3>
                       <p className="text-sm text-gray-400 mt-1">
-                        We'll notify you soon
+                        Please use the M-Pesa option
                       </p>
                     </div>
 
@@ -825,7 +767,6 @@ export default function DepositPageEarlySave() {
                         min="100"
                         disabled
                       />
-                      <p className="text-xs text-gray-400">KES {kshAmount.toLocaleString()}</p>
                     </div>
 
                     <div className="grid grid-cols-3 gap-2">
@@ -846,9 +787,9 @@ export default function DepositPageEarlySave() {
 
                     <div className="border border-dashed border-purple-500 rounded-lg p-6 text-center bg-purple-900/10">
                       <Banknote className="w-10 h-10 mx-auto text-purple-400 mb-3" />
-                      <h3 className="font-medium text-white">Bank Transfers Not allowed from your location, use phone transfer option</h3>
+                      <h3 className="font-medium text-white">Bank Transfers Not available</h3>
                       <p className="text-sm text-gray-400 mt-1">
-                        We'll let you know.
+                        Please use the M-Pesa option
                       </p>
                     </div>
 
@@ -877,11 +818,7 @@ export default function DepositPageEarlySave() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Processing time:</span>
-                    <span className="text-white">Instant (M-Pesa)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Exchange rate:</span>
-                    <span className="text-white">1 USD = 130 KES</span>
+                    <span className="text-white">Instant</span>
                   </div>
                 </div>
               </CardContent>
