@@ -153,48 +153,29 @@ export default function JetWinAviator() {
     if (email) {
       setUserEmail(email)
       setIsAdmin(email === "admin@gmail.com")
-      // Fetch profile
-      fetch("https://av-backend-qp7e.onrender.com/api/users/profile", {
+      // Fetch profile using /api/auth/me
+      const token = localStorage.getItem("token")
+      fetch("https://av-backend-qp7e.onrender.com/api/auth/me", {
         method: "GET",
-        headers: { "Content-Type": "application/json", email: email },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
       })
         .then((res) => res.json())
         .then((authData) => {
-          setProfile(authData.user) // Set the full user profile first
-
-          let display_name = "User" // Default fallback
-          if (authData.user) {
-            if (authData.user.firstname && authData.user.lastname) {
-              display_name = `${authData.user.firstname} ${authData.user.lastname}`
-            } else if (authData.user.firstname) {
-              display_name = authData.user.firstname
-            } else if (authData.user.lastname) {
-              display_name = authData.user.lastname
-            } else if (authData.user.email) {
-              // Fallback to email part if no name fields
-              display_name = authData.user.email.split("@")[0]
-            }
-          } else if (email) {
-            // If authData.user is null but email exists in local storage
-            display_name = email.split("@")[0]
+          setProfile(authData.user || authData) // Some APIs return user, some return the user directly
+          let lastName = "Guest"
+          const user = authData.user || authData
+          if (user && user.lastname) {
+            lastName = user.lastname.charAt(0).toUpperCase() + user.lastname.slice(1)
           }
-
-          setGreetingName(`${getGreeting()}, ${display_name.charAt(0).toUpperCase() + display_name.slice(1)}`)
+          setGreetingName(`Hello ${lastName}`)
         })
         .catch((error) => {
           console.error("Error fetching profile:", error)
           setProfile(null)
-          // If profile fetch fails, still try to set greeting from local storage email
-          if (email) {
-            const namePart = email.split("@")[0]
-            setGreetingName(`${getGreeting()}, ${namePart.charAt(0).toUpperCase() + namePart.slice(1)}`)
-          } else {
-            setGreetingName(`${getGreeting()}, Guest`)
-          }
+          setGreetingName("Hello Guest")
         })
     } else {
-      // If no email in local storage, set a generic greeting
-      setGreetingName(`${getGreeting()}, Guest`)
+      setGreetingName("Hello Guest")
     }
 
     // Load music preference
@@ -881,14 +862,9 @@ export default function JetWinAviator() {
             <div className="text-xl font-bold text-red-400">JetCash Aviator</div>
           </div>
           <div className="flex items-center space-x-4">
-            <div className="text-green-400 font-bold text-sm flex items-center gap-2">
-              ${balance.toFixed(2)}
-              {profile && (
-                <span className="text-xs text-green-300 ml-1">
-                  {greetingName}
-                  {profile.phone && ` | ${profile.phone}`}
-                </span>
-              )}
+            <div className="flex flex-col items-end">
+              <span className="text-green-400 font-bold text-sm">${balance.toFixed(2)}</span>
+              <span className="text-xs text-yellow-300 font-semibold">{greetingName}</span>
             </div>
             <div className="flex items-center space-x-2">
               {profile ? (
@@ -913,7 +889,7 @@ export default function JetWinAviator() {
           <div className="flex items-center space-x-4">
             <div className="text-2xl font-bold text-yellow-400">JetCash!</div>
             {isAdmin && <Badge className="bg-red-600 text-white">ADMIN MODE</Badge>}
-            {profile && <span className="ml-4 text-lg text-green-400">{greetingName}</span>}
+            <span className="ml-4 text-lg text-yellow-300 font-semibold">{greetingName}</span>
             {profile && (
               <span className="ml-4 text-sm text-gray-300">{profile.phone ? `Phone: ${profile.phone}` : ""}</span>
             )}
