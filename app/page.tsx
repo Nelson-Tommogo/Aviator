@@ -1021,9 +1021,9 @@ export default function JetWinAviator() {
       {/* Mobile Header */}
       <header className="bg-gray-800 border-b border-gray-700 p-4 md:hidden">
         <div className="flex items-center justify-between">
-          {/* <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-4">
             <div className="text-xl font-bold text-red-400">JetCash</div>
-          </div> */}
+          </div>
           <div className="flex items-center space-x-2">
             <span className="text-xs text-yellow-300 font-semibold">{greetingName}</span>
             <span className="text-green-400 font-bold text-sm">${balance.toFixed(2)}</span>
@@ -1207,7 +1207,11 @@ export default function JetWinAviator() {
                           <span className="truncate">{bet.player}</span>
                         </div>
                         <span className="text-xs truncate">${bet.amount.toFixed(0)}</span>
-                        <span className={bet.status === "win" || bet.status === "cashed_out" ? "text-green-400" : "text-red-400"}>
+                        <span
+                          className={
+                            bet.status === "win" || bet.status === "cashed_out" ? "text-green-400" : "text-red-400"
+                          }
+                        >
                           {bet.status === "win" || bet.status === "cashed_out" ? `${bet.multiplier.toFixed(2)}x` : "-"}
                         </span>
                         <div className="truncate overflow-hidden">
@@ -1244,10 +1248,10 @@ export default function JetWinAviator() {
             className="relative h-64 md:h-96 overflow-hidden flex-shrink-0"
             style={{
               background: `
-          radial-gradient(ellipse at center, rgba(0,0,0,0.95) 0%, rgba(16,33,62,0.9) 20%, rgba(15,52,96,0.8) 40%, rgba(83,52,131,0.7) 60%, rgba(114,9,183,0.6) 80%, rgba(147,51,234,0.5) 100%),
-          linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.03) 50%, transparent 70%),
-          linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.02) 50%, transparent 60%)
-        `,
+        radial-gradient(ellipse at center, rgba(0,0,0,0.95) 0%, rgba(16,33,62,0.9) 20%, rgba(15,52,96,0.8) 40%, rgba(83,52,131,0.7) 60%, rgba(114,9,183,0.6) 80%, rgba(147,51,234,0.5) 100%),
+        linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.03) 50%, transparent 70%),
+        linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.02) 50%, transparent 60%)
+      `,
               backgroundSize: "100% 100%, 100px 100px, 80px 80px",
               animation: gameState === "flying" ? "moveBackground 2s linear infinite" : "none", // Faster background
             }}
@@ -1424,12 +1428,12 @@ export default function JetWinAviator() {
                 </div>
 
                 <div className="grid grid-cols-4 gap-2 mb-4">
-                  {[100.1, 250, 500, 1000].map((amount) => (
+                  {[10, 50, 100, 250, 500, 800, 1500, 2500].map((amount) => (
                     <Button
                       key={amount}
                       variant="outline"
                       size="sm"
-                      onClick={() => setAutoCashout(Math.max(100.1, amount))}
+                      onClick={() => setAutoCashout(Math.max(10, amount))} // Adjusted min to 10
                       className="bg-gray-600 border-gray-500 text-white text-xs"
                     >
                       {amount}x
@@ -1455,10 +1459,10 @@ export default function JetWinAviator() {
                         <Input
                           type="number"
                           value={autoCashout}
-                          onChange={(e) => setAutoCashout(Math.max(100.1, Number.parseFloat(e.target.value) || 100.1))}
+                          onChange={(e) => setAutoCashout(Math.max(10, Number.parseFloat(e.target.value) || 10))} // Adjusted min to 10
                           className="w-20 bg-gray-600 border-gray-500 text-white text-center text-xs"
                           step="0.01"
-                          min="100.1"
+                          min="10" // Changed from 100.1 to 10
                         />
                         <span className="text-sm text-gray-400">x</span>
                         <Button variant="ghost" size="sm" className="text-gray-400" onClick={() => setAutoCash(false)}>
@@ -1609,7 +1613,11 @@ export default function JetWinAviator() {
             variant={activeTab === "Betting History" ? "default" : "outline"}
             size="sm"
             onClick={() => setActiveTab("Betting History")}
-            className={activeTab === "Betting History" ? "bg-gray-700 text-white" : "bg-transparent border-gray-600 text-gray-400"}
+            className={
+              activeTab === "Betting History"
+                ? "bg-gray-700 text-white"
+                : "bg-transparent border-gray-600 text-gray-400"
+            }
           >
             Betting History
           </Button>
@@ -1617,7 +1625,11 @@ export default function JetWinAviator() {
             variant={activeTab === "Withdrawal History" ? "default" : "outline"}
             size="sm"
             onClick={() => setActiveTab("Withdrawal History")}
-            className={activeTab === "Withdrawal History" ? "bg-gray-700 text-white" : "bg-transparent border-gray-600 text-gray-400"}
+            className={
+              activeTab === "Withdrawal History"
+                ? "bg-gray-700 text-white"
+                : "bg-transparent border-gray-600 text-gray-400"
+            }
           >
             Withdrawal History
           </Button>
@@ -1810,11 +1822,10 @@ export default function JetWinAviator() {
             </div>
           </div>
         </div>
-      )
-}
+      )}
       {/* WhatsApp Chatbot Icon - Floating Action Button */}
       <a
-        href="https://wa.me/254700447664"
+        href="https://wa.me/+17253246051"
         target="_blank"
         rel="noopener noreferrer"
         className="fixed bottom-4 left-4 md:bottom-8 md:left-8 bg-green-500 hover:bg-green-600 text-white p-3 rounded-full shadow-lg flex items-center justify-center z-50 transition-all duration-300 hover:scale-110"
