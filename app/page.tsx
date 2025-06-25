@@ -26,22 +26,41 @@ interface CashoutHistory {
   multiplier: number
   winAmount: number
   timestamp: Date
-  timeAgo: string
+}
+
+interface Withdrawal {
+  id: string
+  player: string
+  amount: number
+  timestamp: Date
+  status: "pending" | "completed" | "failed"
+}
+
+interface BettingHistoryEntry {
+  id: string
+  player: string
+  amount: number
+  multiplier: number
+  winAmount: number
+  status: "win" | "loss" | "cashed_out"
+  timestamp: Date
 }
 
 export default function JetWinAviator() {
   const [gameState, setGameState] = useState<"waiting" | "flying" | "crashed">("waiting")
   const [multiplier, setMultiplier] = useState(1.0)
-  const [betAmount, setBetAmount] = useState(10.5) // $10.50
-  const [autoCashout, setAutoCashout] = useState(1.1)
+  const [betAmount, setBetAmount] = useState(100.0) // Minimum bet amount is 100 USD
+  const [autoCashout, setAutoCashout] = useState(100.0) // Minimum multiplier is 100X
   const [balance, setBalance] = useState(0) // Initialize balance to 0
   const [allBets, setAllBets] = useState<Bet[]>([])
   const [previousBets, setPreviousBets] = useState<Bet[]>([])
   const [topBets, setTopBets] = useState<Bet[]>([])
   const [cashoutHistory, setCashoutHistory] = useState<CashoutHistory[]>([])
+  const [bettingHistory, setBettingHistory] = useState<BettingHistoryEntry[]>([]) // New state for betting history
+  const [withdrawalHistory, setWithdrawalHistory] = useState<Withdrawal[]>([]) // New state for withdrawal history
   const [betActive, setBetActive] = useState(false)
   const [betCashed, setBetCashed] = useState(false)
-  const [activeTab, setActiveTab] = useState("All Bets")
+  const [activeTab, setActiveTab] = useState("All Bets") // Updated activeTab options
   const [autoBet, setAutoBet] = useState(false)
   const [autoCash, setAutoCash] = useState(false)
   const [betMode, setBetMode] = useState<"bet" | "auto">("bet")
@@ -52,9 +71,7 @@ export default function JetWinAviator() {
   const [musicEnabled, setMusicEnabled] = useState(true)
   const [audioInitialized, setAudioInitialized] = useState(false)
   const [showSoundModal, setShowSoundModal] = useState(false)
-  const [showTopCashouts, setShowTopCashouts] = useState(false)
   const [graphData, setGraphData] = useState<{ x: number; y: number }[]>([])
-  const [maxMultiplier, setMaxMultiplier] = useState(10)
   const [profile, setProfile] = useState<any>(null)
   const [greetingName, setGreetingName] = useState("")
 
@@ -83,26 +100,11 @@ export default function JetWinAviator() {
     return `${firstDigit}****${lastDigit}`
   }
 
-  // Generate time ago string
-  const generateTimeAgo = () => {
-    const timeOptions = [
-      "1 min ago",
-      "2 mins ago",
-      "3 mins ago",
-      "4 mins ago",
-      "5 mins ago",
-      "6 mins ago",
-      "7 mins ago",
-      "8 mins ago",
-      "9 mins ago",
-      "10 mins ago",
-      "15 mins ago",
-      "20 mins ago",
-      "30 mins ago",
-      "45 mins ago",
-      "1 hour ago",
-    ]
-    return timeOptions[Math.floor(Math.random() * timeOptions.length)]
+  // Generate random past date for history
+  const generateRandomPastDate = (daysAgo: number) => {
+    const date = new Date()
+    date.setDate(date.getDate() - Math.floor(Math.random() * daysAgo))
+    return date
   }
 
   // Initialize audio with better web compatibility
@@ -157,7 +159,7 @@ export default function JetWinAviator() {
       const token = localStorage.getItem("token")
       fetch("https://av-backend-qp7e.onrender.com/api/auth/me", {
         method: "GET",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
         .then((authData) => {
@@ -241,11 +243,10 @@ export default function JetWinAviator() {
     localStorage.setItem("jetcash-music-enabled", JSON.stringify(musicEnabled))
   }, [musicEnabled])
 
-  // Generate dynamic bet amount
+  // Generate dynamic bet amount (minimum 100 USD)
   const generateDynamicBetAmount = () => {
     const amounts = [
-      5.5, 10.25, 15.75, 20.0, 25.5, 50.0, 75.25, 100.0, 150.5, 200.75, 300.0, 500.25, 750.5, 1000.0, 1500.75, 2000.0,
-      3000.5, 5000.0, 7500.25, 10000.0,
+      100.0, 150.5, 200.75, 300.0, 500.25, 750.5, 1000.0, 1500.75, 2000.0, 3000.5, 5000.0, 7500.25, 10000.0,
     ]
     return amounts[Math.floor(Math.random() * amounts.length)]
   }
@@ -254,10 +255,12 @@ export default function JetWinAviator() {
   const generateDummyData = useCallback(() => {
     const bets: Bet[] = []
     const cashouts: CashoutHistory[] = []
+    const bettingHistoryData: BettingHistoryEntry[] = []
+    const withdrawalHistoryData: Withdrawal[] = []
 
     for (let i = 0; i < 10000; i++) {
       const player = generatePlayerName()
-      const amount = generateDynamicBetAmount()
+      const amount = generateDynamicBetAmount() // Ensure >= 100
       const multiplier = Math.random() * 100 + 1
       const status = Math.random() > 0.4 ? "win" : "loss"
       const winAmount = status === "win" ? amount * multiplier : 0
@@ -269,7 +272,18 @@ export default function JetWinAviator() {
         multiplier: Number(multiplier.toFixed(2)),
         winAmount: Number(winAmount.toFixed(2)),
         status,
-        timestamp: new Date(Date.now() - Math.random() * 86400000 * 30),
+        timestamp: generateRandomPastDate(30), // Random date within last 30 days
+      })
+
+      // Populate betting history
+      bettingHistoryData.push({
+        id: `bh-${i}`,
+        player,
+        amount,
+        multiplier: Number(multiplier.toFixed(2)),
+        winAmount: Number(winAmount.toFixed(2)),
+        status: status === "win" ? "cashed_out" : "loss",
+        timestamp: generateRandomPastDate(365), // Random date within last year
       })
     }
 
@@ -313,7 +327,7 @@ export default function JetWinAviator() {
     for (let i = 0; i < 1000; i++) {
       const player = generatePlayerName()
       const avatar = avatars[Math.floor(Math.random() * avatars.length)]
-      const amount = generateDynamicBetAmount()
+      const amount = generateDynamicBetAmount() // Ensure >= 100
       // Use recent multipliers for more realistic history
       const multiplier = i < recentMultipliers.length ? recentMultipliers[i] : Math.random() * 50 + 1.1
       const winAmount = amount * multiplier
@@ -325,15 +339,31 @@ export default function JetWinAviator() {
         amount,
         multiplier: Number(multiplier.toFixed(2)),
         winAmount: Number(winAmount.toFixed(2)),
-        timestamp: new Date(Date.now() - Math.random() * 3600000), // Within last hour
-        timeAgo: generateTimeAgo(),
+        timestamp: new Date(), // Today's date as requested
+      })
+    }
+
+    // Generate dummy withdrawal history
+    for (let i = 0; i < 500; i++) {
+      const player = generatePlayerName()
+      const amount = Math.max(100, Math.floor(Math.random() * 5000) + 100) // Min 100 USD
+      const statuses: ("pending" | "completed" | "failed")[] = ["pending", "completed", "failed"]
+      const status = statuses[Math.floor(Math.random() * statuses.length)]
+      withdrawalHistoryData.push({
+        id: `wd-${i}`,
+        player,
+        amount,
+        timestamp: generateRandomPastDate(365), // Random date within last year
+        status,
       })
     }
 
     setAllBets(bets)
     setPreviousBets(bets.filter((bet) => bet.status === "win").slice(0, 2000))
     setTopBets(bets.sort((a, b) => b.winAmount - a.winAmount).slice(0, 1000))
-    setCashoutHistory(cashouts.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()))
+    setCashoutHistory(cashouts.sort((a, b) => b.winAmount - a.winAmount)) // Sort by win amount for "Biggest Wins"
+    setBettingHistory(bettingHistoryData.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()))
+    setWithdrawalHistory(withdrawalHistoryData.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()))
   }, [])
 
   // Update data dynamically every few seconds
@@ -343,7 +373,7 @@ export default function JetWinAviator() {
       const updated = [...prev]
       for (let i = 0; i < 10; i++) {
         const randomIndex = Math.floor(Math.random() * updated.length)
-        const amount = generateDynamicBetAmount()
+        const amount = generateDynamicBetAmount() // Ensure >= 100
         const multiplier = Math.random() * 100 + 1
         const status = Math.random() > 0.4 ? "win" : "loss"
         const winAmount = status === "win" ? amount * multiplier : 0
@@ -369,15 +399,42 @@ export default function JetWinAviator() {
         id: `cashout-${Date.now()}`,
         player: generatePlayerName(),
         avatar: ["🎮", "🚀", "⭐", "🔥", "💎", "🎯", "⚡", "🌟", "🎲", "🏆"][Math.floor(Math.random() * 10)],
-        amount: generateDynamicBetAmount(),
+        amount: generateDynamicBetAmount(), // Ensure >= 100
         multiplier: recentMultiplier || Number((Math.random() * 50 + 1.1).toFixed(2)),
         winAmount: 0,
-        timestamp: new Date(),
-        timeAgo: generateTimeAgo(),
+        timestamp: new Date(), // Today's date
       }
       newCashout.winAmount = newCashout.amount * newCashout.multiplier
 
-      return [newCashout, ...updated.slice(0, 999)]
+      return [newCashout, ...updated.slice(0, 999)].sort((a, b) => b.winAmount - a.winAmount) // Keep sorted by win amount
+    })
+
+    // Update betting history
+    setBettingHistory((prev) => {
+      const newEntry: BettingHistoryEntry = {
+        id: `bh-${Date.now()}`,
+        player: generatePlayerName(),
+        amount: generateDynamicBetAmount(),
+        multiplier: Number((Math.random() * 100 + 1).toFixed(2)),
+        winAmount: 0,
+        status: Math.random() > 0.5 ? "cashed_out" : "loss",
+        timestamp: generateRandomPastDate(365),
+      }
+      newEntry.winAmount = newEntry.status === "cashed_out" ? newEntry.amount * newEntry.multiplier : 0
+      return [newEntry, ...prev.slice(0, 999)].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+    })
+
+    // Update withdrawal history
+    setWithdrawalHistory((prev) => {
+      const statuses: ("pending" | "completed" | "failed")[] = ["pending", "completed", "failed"]
+      const newEntry: Withdrawal = {
+        id: `wd-${Date.now()}`,
+        player: generatePlayerName(),
+        amount: Math.max(100, Math.floor(Math.random() * 5000) + 100), // Min 100 USD
+        timestamp: generateRandomPastDate(365),
+        status: statuses[Math.floor(Math.random() * statuses.length)],
+      }
+      return [newEntry, ...prev.slice(0, 499)].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
     })
   }, [previousMultipliers])
 
@@ -488,9 +545,9 @@ export default function JetWinAviator() {
       return
     }
 
-    // ✅ Check if bet amount is at least $10
-    if (betAmount < 10) {
-      console.log("❌ Minimum bet amount is $10")
+    // ✅ Check if bet amount is at least $100
+    if (betAmount < 100) {
+      console.log("❌ Minimum bet amount is $100")
       return
     }
 
@@ -761,10 +818,21 @@ export default function JetWinAviator() {
     }
   }, [gameState])
 
-  const getCurrentBets = () => {
-    if (activeTab === "All Bets") return allBets
-    if (activeTab === "Previous") return previousBets
-    return topBets
+  const getDisplayedHistory = () => {
+    switch (activeTab) {
+      case "All Bets":
+        return allBets
+      case "Previous":
+        return previousBets
+      case "Top":
+        return topBets
+      case "Betting History":
+        return bettingHistory
+      case "Withdrawal History":
+        return withdrawalHistory
+      default:
+        return allBets
+    }
   }
 
   const getMultiplierColor = (multiplier: number) => {
@@ -862,7 +930,7 @@ export default function JetWinAviator() {
             <div className="text-xl font-bold text-red-400">JetCash Aviator</div>
           </div>
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-col items-end">
               <span className="text-green-400 font-bold text-sm">${balance.toFixed(2)}</span>
               <span className="text-xs text-yellow-300 font-semibold">{greetingName}</span>
             </div>
@@ -937,7 +1005,7 @@ export default function JetWinAviator() {
         {/* Left Sidebar - Desktop Only */}
         <div className="hidden md:flex w-80 bg-gray-800 border-r border-gray-700 flex-col h-full">
           <div className="p-4 border-b border-gray-700 flex-shrink-0">
-            <div className="flex space-x-2 mb-4">
+            <div className="flex space-x-2 mb-4 overflow-x-auto">
               <Button
                 variant={activeTab === "All Bets" ? "default" : "outline"}
                 size="sm"
@@ -968,40 +1036,92 @@ export default function JetWinAviator() {
               >
                 Top
               </Button>
+              <Button
+                variant={activeTab === "Betting History" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveTab("Betting History")}
+                className={
+                  activeTab === "Betting History" ? "bg-gray-700 text-white" : "bg-transparent border-gray-600 text-gray-400"
+                }
+              >
+                Betting History
+              </Button>
+              <Button
+                variant={activeTab === "Withdrawal History" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveTab("Withdrawal History")}
+                className={
+                  activeTab === "Withdrawal History" ? "bg-gray-700 text-white" : "bg-transparent border-gray-600 text-gray-400"
+                }
+              >
+                Withdrawal History
+              </Button>
             </div>
 
-            <div className="text-sm text-gray-400 mb-2">ALL BETS</div>
-            <div className="text-lg font-bold mb-4">{getCurrentBets().length.toLocaleString()}</div>
+            <div className="text-sm text-gray-400 mb-2">{activeTab.toUpperCase()}</div>
+            <div className="text-lg font-bold mb-4">{getDisplayedHistory().length.toLocaleString()}</div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4">
             <div className="space-y-2">
-              <div className="grid grid-cols-4 text-xs text-gray-400 mb-2 sticky top-0 bg-gray-800 py-2 z-10">
-                <span>Player</span>
-                <span>Bet $</span>
-                <span>X</span>
-                <span>Win $</span>
-              </div>
+              {activeTab === "Withdrawal History" ? (
+                <div className="grid grid-cols-3 text-xs text-gray-400 mb-2 sticky top-0 bg-gray-800 py-2 z-10">
+                  <span>Player</span>
+                  <span>Amount</span>
+                  <span>Status</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 text-xs text-gray-400 mb-2 sticky top-0 bg-gray-800 py-2 z-10">
+                  <span>Player</span>
+                  <span>Bet $</span>
+                  <span>X</span>
+                  <span>Win $</span>
+                </div>
+              )}
 
-              {getCurrentBets()
+              {getDisplayedHistory()
                 .slice(0, 100)
-                .map((bet) => (
-                  <div key={bet.id} className="grid grid-cols-4 text-sm py-1">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center text-xs">
-                        {bet.player.charAt(0)}
+                .map((entry) => {
+                  if (activeTab === "Withdrawal History") {
+                    const withdrawal = entry as Withdrawal;
+                    return (
+                      <div key={withdrawal.id} className="grid grid-cols-3 text-sm py-1">
+                        <div className="flex items-center space-x-1">
+                          <div className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center text-xs">
+                            {withdrawal.player.charAt(0)}
+                          </div>
+                          <span className="truncate">{withdrawal.player}</span>
+                        </div>
+                        <span className="text-xs">${withdrawal.amount.toFixed(0)}</span>
+                        <span className={
+                          withdrawal.status === "completed" ? "text-green-400" :
+                          withdrawal.status === "pending" ? "text-yellow-400" : "text-red-400"
+                        }>
+                          {withdrawal.status.charAt(0).toUpperCase() + withdrawal.status.slice(1)}
+                        </span>
                       </div>
-                      <span className="truncate">{bet.player}</span>
-                    </div>
-                    <span className="text-xs">${bet.amount.toFixed(0)}</span>
-                    <span className={bet.status === "win" ? "text-green-400" : "text-red-400"}>
-                      {bet.status === "win" ? `${bet.multiplier.toFixed(2)}x` : "-"}
-                    </span>
-                    <span className={bet.status === "win" ? "text-green-400" : "text-red-400"}>
-                      {bet.status === "win" ? `$${bet.winAmount.toFixed(0)}` : "$0"}
-                    </span>
-                  </div>
-                ))}
+                    )
+                  } else {
+                    const bet = entry as Bet | BettingHistoryEntry;
+                    return (
+                      <div key={bet.id} className="grid grid-cols-4 text-sm py-1">
+                        <div className="flex items-center space-x-1">
+                          <div className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center text-xs">
+                            {bet.player.charAt(0)}
+                          </div>
+                          <span className="truncate">{bet.player}</span>
+                        </div>
+                        <span className="text-xs">${bet.amount.toFixed(0)}</span>
+                        <span className={bet.status === "win" || bet.status === "cashed_out" ? "text-green-400" : "text-red-400"}>
+                          {bet.status === "win" || bet.status === "cashed_out" ? `${bet.multiplier.toFixed(2)}x` : "-"}
+                        </span>
+                        <span className={bet.status === "win" || bet.status === "cashed_out" ? "text-green-400" : "text-red-400"}>
+                          {bet.status === "win" || bet.status === "cashed_out" ? `$${bet.winAmount.toFixed(0)}` : "$0"}
+                        </span>
+                      </div>
+                    )
+                  }
+                })}
             </div>
           </div>
         </div>
@@ -1185,7 +1305,7 @@ export default function JetWinAviator() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setBetAmount(Math.max(10, betAmount - 1))}
+                    onClick={() => setBetAmount(Math.max(100, betAmount - 10))}
                     className="bg-gray-600 border-gray-500 text-white w-10 h-10 rounded-full"
                   >
                     -
@@ -1193,15 +1313,15 @@ export default function JetWinAviator() {
                   <Input
                     type="number"
                     value={betAmount.toFixed(2)}
-                    onChange={(e) => setBetAmount(Math.max(10, Number.parseFloat(e.target.value) || 10))}
+                    onChange={(e) => setBetAmount(Math.max(100, Number.parseFloat(e.target.value) || 100))}
                     className="text-2xl font-bold text-white min-w-[120px] text-center bg-gray-600 border-gray-500"
                     step="0.01"
-                    min="10"
+                    min="100"
                   />
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setBetAmount(Math.max(10, betAmount + 1))}
+                    onClick={() => setBetAmount(Math.max(100, betAmount + 10))}
                     className="bg-gray-600 border-gray-500 text-white w-10 h-10 rounded-full"
                   >
                     +
@@ -1209,12 +1329,12 @@ export default function JetWinAviator() {
                 </div>
 
                 <div className="grid grid-cols-4 gap-2 mb-4">
-                  {[10, 25, 50, 100].map((amount) => (
+                  {[100, 250, 500, 1000].map((amount) => (
                     <Button
                       key={amount}
                       variant="outline"
                       size="sm"
-                      onClick={() => setBetAmount(Math.max(10, amount))}
+                      onClick={() => setBetAmount(Math.max(100, amount))}
                       className="bg-gray-600 border-gray-500 text-white text-xs"
                     >
                       ${amount}
@@ -1240,10 +1360,10 @@ export default function JetWinAviator() {
                         <Input
                           type="number"
                           value={autoCashout}
-                          onChange={(e) => setAutoCashout(Number.parseFloat(e.target.value) || 1.1)}
+                          onChange={(e) => setAutoCashout(Math.max(100.0, Number.parseFloat(e.target.value) || 100.0))}
                           className="w-20 bg-gray-600 border-gray-500 text-white text-center text-xs"
                           step="0.01"
-                          min="1.01"
+                          min="100"
                         />
                         <span className="text-sm text-gray-400">x</span>
                         <Button variant="ghost" size="sm" className="text-gray-400" onClick={() => setAutoCash(false)}>
@@ -1257,7 +1377,7 @@ export default function JetWinAviator() {
                 {gameState === "waiting" ? (
                   <Button
                     onClick={placeBet}
-                    disabled={betActive || betAmount > balance || betAmount < 10}
+                    disabled={betActive || betAmount > balance || betAmount < 100}
                     className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-6 text-lg"
                   >
                     Bet
@@ -1299,26 +1419,14 @@ export default function JetWinAviator() {
         <div className="hidden md:flex w-80 bg-gray-800 border-l border-gray-700 flex-col h-full">
           <div className="p-4 border-b border-gray-700 flex-shrink-0">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold">Cashout History</span>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  className={showTopCashouts ? "bg-yellow-500 text-black" : "bg-gray-700 text-white"}
-                  onClick={() => setShowTopCashouts((prev) => !prev)}
-                >
-                  {showTopCashouts ? "Recent" : "Top Results"}
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => setShowRules(!showRules)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  <Info className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-            <div className="text-xs text-gray-400">
-              <div>{showTopCashouts ? "Biggest wins (highest win amounts)" : "Recent winners and their cashouts"}</div>
+              <span className="text-sm font-semibold">Biggest Wins (Highest win amounts)</span>
+              <Button
+                size="sm"
+                onClick={() => setShowRules(!showRules)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Info className="w-4 h-4" />
+              </Button>
             </div>
           </div>
 
@@ -1348,10 +1456,7 @@ export default function JetWinAviator() {
           ) : (
             <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-3">
-                {(showTopCashouts
-                  ? [...cashoutHistory].sort((a, b) => b.winAmount - a.winAmount).slice(0, 50)
-                  : cashoutHistory.slice(0, 100)
-                ).map((cashout) => (
+                {cashoutHistory.slice(0, 100).map((cashout) => (
                   <div key={cashout.id} className="flex items-start space-x-3 bg-gray-700 p-3 rounded-lg">
                     <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg">
                       {cashout.avatar}
@@ -1359,7 +1464,7 @@ export default function JetWinAviator() {
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-semibold text-white">{cashout.player}</span>
-                        <span className="text-xs text-gray-400">{cashout.timeAgo}</span>
+                        <span className="text-xs text-gray-400">{new Date().toLocaleDateString()}</span> {/* Today's date */}
                       </div>
                       <div className="text-xs text-gray-300">Bet: ${cashout.amount.toFixed(2)}</div>
                       <div className="flex items-center justify-between">
@@ -1375,56 +1480,186 @@ export default function JetWinAviator() {
         </div>
       </div>
 
-      {/* Mobile Cashout History with Top Results button */}
-      <div
-        className="md:hidden bg-gray-900 p-3 flex-1 overflow-y-auto"
-        style={{ height: "calc(100vh - 64px - 200px)" }}
-      >
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-sm font-semibold text-white">Cashout History</div>
+      {/* Mobile History Tabs */}
+      <div className="md:hidden bg-gray-800 p-2 border-t border-gray-700 flex-shrink-0">
+        <div className="flex space-x-2 mb-2 overflow-x-auto justify-center">
           <Button
+            variant={activeTab === "All Bets" ? "default" : "outline"}
             size="sm"
-            className={showTopCashouts ? "bg-yellow-500 text-black" : "bg-gray-700 text-white"}
-            onClick={() => setShowTopCashouts((prev) => !prev)}
+            onClick={() => setActiveTab("All Bets")}
+            className={
+              activeTab === "All Bets" ? "bg-gray-700 text-white" : "bg-transparent border-gray-600 text-gray-400"
+            }
           >
-            {showTopCashouts ? "Recent" : "Top Results"}
+            All Bets
+          </Button>
+          <Button
+            variant={activeTab === "Previous" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveTab("Previous")}
+            className={
+              activeTab === "Previous" ? "bg-gray-700 text-white" : "bg-transparent border-gray-600 text-gray-400"
+            }
+          >
+            Previous
+          </Button>
+          <Button
+            variant={activeTab === "Top" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveTab("Top")}
+            className={
+              activeTab === "Top" ? "bg-gray-700 text-white" : "bg-transparent border-gray-600 text-gray-400"
+            }
+          >
+            Top
+          </Button>
+          <Button
+            variant={activeTab === "Betting History" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveTab("Betting History")}
+            className={
+              activeTab === "Betting History" ? "bg-gray-700 text-white" : "bg-transparent border-gray-600 text-gray-400"
+            }
+          >
+            Betting History
+          </Button>
+          <Button
+            variant={activeTab === "Withdrawal History" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveTab("Withdrawal History")}
+            className={
+              activeTab === "Withdrawal History" ? "bg-gray-700 text-white" : "bg-transparent border-gray-600 text-gray-400"
+            }
+          >
+            Withdrawal History
           </Button>
         </div>
-        <div className="text-xs text-gray-400 mb-4">
-          {showTopCashouts ? "Biggest wins (highest win amounts)" : "Recent winners and their cashouts"}
+      </div>
+
+  {/* Mobile History Content */}
+<div
+  className="md:hidden bg-gray-900 p-3 flex-1 overflow-y-auto"
+  style={{ height: "calc(100vh - 64px - 200px - 60px)" }} // Adjusted height for new tabs
+>
+  <div className="flex items-center justify-between mb-2">
+    <div className="text-sm font-semibold text-white">
+      {activeTab === "Withdrawal History" 
+        ? "Withdrawal History" 
+        : activeTab === "Betting History" 
+          ? "Betting History" 
+          : "Biggest Wins (Highest win amounts)"
+      }
+    </div>
+    <Button
+      size="sm"
+      onClick={() => setShowRules(!showRules)}
+      className="bg-blue-600 hover:bg-blue-700 text-white"
+    >
+      <Info className="w-4 h-4" />
+    </Button>
+  </div>
+  
+  <div className="space-y-4">
+    {showRules ? (
+      <div className="space-y-4 text-sm text-gray-300">
+        <div>
+          <h4 className="font-semibold text-white mb-2">How to Play</h4>
+          <p>1. Place your bet before the plane takes off</p>
+          <p>2. Watch the multiplier increase as the plane flies</p>
+          <p>3. Cash out before the plane flies away</p>
+          <p>4. The longer you wait, the higher the multiplier</p>
         </div>
-        <div className="space-y-4">
-          {(showTopCashouts
-            ? [...cashoutHistory].sort((a, b) => b.winAmount - a.winAmount).slice(0, 50)
-            : cashoutHistory.slice(0, 100)
-          ).map((cashout) => (
-            <div key={cashout.id} className="bg-gray-800 p-4 rounded-lg flex items-start space-x-3">
+        <div>
+          <h4 className="font-semibold text-white mb-2">Auto Features</h4>
+          <p>• Auto Bet: Automatically place bets each round</p>
+          <p>• Auto Cash Out: Automatically cash out at set multiplier</p>
+        </div>
+      </div>
+    ) : (
+      getDisplayedHistory().slice(0, 100).map((entry) => {
+        if (activeTab === "Withdrawal History") {
+          const withdrawal = entry as Withdrawal;
+          return (
+            <div key={withdrawal.id} className="bg-gray-800 p-4 rounded-lg flex items-start space-x-3">
               <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg">
-                {cashout.avatar}
+                {withdrawal.player.charAt(0)}
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-semibold text-white">{cashout.player}</span>
-                  <span className="text-xs text-gray-400">{cashout.timestamp.toLocaleTimeString()}</span>
+                  <span className="text-sm font-semibold text-white">{withdrawal.player}</span>
+                  <span className="text-xs text-gray-400">{withdrawal.timestamp.toLocaleDateString()}</span>
                 </div>
-                <div className="text-xs text-gray-300 mb-1">Bet: ${cashout.amount.toFixed(2)}</div>
+                <div className="text-xs text-gray-300 mb-1">Amount: ${withdrawal.amount.toFixed(2)}</div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-green-400">{cashout.multiplier.toFixed(2)}x</span>
-                  <span className="text-sm font-bold text-yellow-400">+${cashout.winAmount.toFixed(2)}</span>
+                  <span className={
+                    withdrawal.status === "completed" ? "text-green-400" :
+                    withdrawal.status === "pending" ? "text-yellow-400" : "text-red-400"
+                  }>
+                    {withdrawal.status.charAt(0).toUpperCase() + withdrawal.status.slice(1)}
+                  </span>
                 </div>
               </div>
             </div>
-          ))}
-        </div>
-        {/* Mobile Footer - only show on mobile, after cashout history */}
-        <footer className="bg-gray-800 border-t border-gray-700 p-4 text-center mt-2 md:hidden">
-          <div className="flex items-center justify-center space-x-2 mb-2">
-            <span className="text-sm text-gray-400">✓ Provably Fair Game</span>
-          </div>
-          <div className="text-xs text-gray-500">Powered by SPRIBE</div>
-        </footer>
-      </div>
-
+          );
+        } else if (activeTab === "Betting History") {
+          const betHistory = entry as BettingHistoryEntry;
+          return (
+            <div key={betHistory.id} className="bg-gray-800 p-4 rounded-lg flex items-start space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg">
+                {betHistory.player.charAt(0)}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-semibold text-white">{betHistory.player}</span>
+                  <span className="text-xs text-gray-400">{betHistory.timestamp.toLocaleDateString()}</span>
+                </div>
+                <div className="text-xs text-gray-300 mb-1">Bet: ${betHistory.amount.toFixed(2)}</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-green-400">{betHistory.multiplier.toFixed(2)}x</span>
+                  <span className="text-sm font-bold text-yellow-400">
+                    {betHistory.status === "cashed_out" ? `+${betHistory.winAmount.toFixed(2)}` : "Loss"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        } else {
+          const bet = entry as Bet;
+          return (
+            <div key={bet.id} className="bg-gray-800 p-4 rounded-lg flex items-start space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg">
+                {bet.player.charAt(0)}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-semibold text-white">{bet.player}</span>
+                  <span className="text-xs text-gray-400">
+                    {activeTab === "Top" ? new Date().toLocaleDateString() : bet.timestamp.toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-300 mb-1">Bet: ${bet.amount.toFixed(2)}</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-green-400">{bet.multiplier.toFixed(2)}x</span>
+                  <span className="text-sm font-bold text-yellow-400">
+                    {bet.status === "win" ? `+${bet.winAmount.toFixed(2)}` : "Loss"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        }
+      })
+    )}
+  </div>
+  
+  {/* Mobile Footer - only show on mobile, after cashout history */}
+  <footer className="bg-gray-800 border-t border-gray-700 p-4 text-center mt-2 md:hidden">
+    <div className="flex items-center justify-center space-x-2 mb-2">
+      <span className="text-sm text-gray-400">✓ Provably Fair Game</span>
+    </div>
+    <div className="text-xs text-gray-500">Powered by SPRIBE</div>
+  </footer>
+</div>
       {/* Mobile Deposit Button */}
       <div className="md:hidden fixed bottom-4 right-4">
         <Link href={profile ? "/deposit" : "/login"}>
