@@ -186,12 +186,12 @@ export default function JetWinAviator() {
         .then((res) => res.json())
         .then((authData) => {
           setProfile(authData.user || authData)
-          let lastName = "Guest"
+          let firstname = "Guest"
           const user = authData.user || authData
-          if (user && user.lastname) {
-            lastName = user.lastname.charAt(0).toUpperCase() + user.lastname.slice(1)
+          if (user && user.firstname) {
+            firstname = user.firstname.charAt(0).toUpperCase() + user.firstname.slice(1)
           }
-          setGreetingName(`Hello ${lastName}`)
+          setGreetingName(`Hello ${firstname}`)
         })
         .catch((error) => {
           console.error("Error fetching profile:", error)
