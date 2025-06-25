@@ -186,12 +186,12 @@ export default function JetWinAviator() {
         .then((res) => res.json())
         .then((authData) => {
           setProfile(authData.user || authData)
-          let firstname = "Guest"
+          let lastName = "Guest"
           const user = authData.user || authData
-          if (user && user.firstname) {
-            firstname = user.firstname.charAt(0).toUpperCase() + user.firstname.slice(1)
+          if (user && user.lastname) {
+            lastName = user.lastname.charAt(0).toUpperCase() + user.lastname.slice(1)
           }
-          setGreetingName(`Hello ${firstname}`)
+          setGreetingName(`Hello ${lastName}`)
         })
         .catch((error) => {
           console.error("Error fetching profile:", error)
@@ -895,9 +895,9 @@ export default function JetWinAviator() {
       case "Top":
         return topBets
       case "Betting History":
-        return bettingHistory
+        return isAdmin ? bettingHistory : []
       case "Withdrawal History":
-        return withdrawalHistory
+        return isAdmin ? withdrawalHistory : []
       default:
         return allBets
     }
@@ -1025,8 +1025,6 @@ export default function JetWinAviator() {
             <div className="text-xl font-bold text-red-400">JetCash Aviator</div>
           </div>
           <div className="flex items-center space-x-2">
-            {" "}
-            {/* Changed to flex-row and space-x-2 */}
             <span className="text-xs text-yellow-300 font-semibold">{greetingName}</span>
             <span className="text-green-400 font-bold text-sm">${balance.toFixed(2)}</span>
           </div>
@@ -1164,20 +1162,20 @@ export default function JetWinAviator() {
             <div className="text-lg font-bold mb-4">{getDisplayedHistory().length.toLocaleString()}</div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="space-y-2">
+          <div className="flex-1 overflow-y-auto p-4 min-w-0 w-full">
+            <div className="space-y-2 w-full min-w-0">
               {activeTab === "Withdrawal History" ? (
-                <div className="grid grid-cols-3 text-xs text-gray-400 mb-2 sticky top-0 bg-gray-800 py-2 z-10">
-                  <span>Player</span>
-                  <span>Amount</span>
-                  <span>Status</span>
+                <div className="grid grid-cols-3 w-full table-fixed text-xs text-gray-400 mb-2 sticky top-0 bg-gray-800 py-2 z-10">
+                  <span className="truncate">Player</span>
+                  <span className="truncate">Amount</span>
+                  <span className="truncate">Status</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-4 text-xs text-gray-400 mb-2 sticky top-0 bg-gray-800 py-2 z-10">
-                  <span>Player</span>
-                  <span>Bet $</span>
-                  <span>X</span>
-                  <span>Win $</span>
+                <div className="grid grid-cols-4 w-full table-fixed text-xs text-gray-400 mb-2 sticky top-0 bg-gray-800 py-2 z-10">
+                  <span className="truncate">Player</span>
+                  <span className="truncate">Bet $</span>
+                  <span className="truncate">X</span>
+                  <span className="truncate">Win $</span>
                 </div>
               )}
 
@@ -1187,36 +1185,34 @@ export default function JetWinAviator() {
                   if (activeTab === "Withdrawal History") {
                     const withdrawal = entry as Withdrawal
                     return (
-                      <div key={withdrawal.id} className="grid grid-cols-3 text-sm py-1">
-                        <div className="flex items-center space-x-1">
+                      <div key={withdrawal.id} className="grid grid-cols-3 w-full table-fixed text-sm py-1">
+                        <div className="flex items-center space-x-1 truncate overflow-hidden">
                           <div className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center text-xs">
                             {withdrawal.player.charAt(0)}
                           </div>
                           <span className="truncate">{withdrawal.player}</span>
                         </div>
-                        <span className="text-xs">${withdrawal.amount.toFixed(0)}</span>
+                        <span className="text-xs truncate">${withdrawal.amount.toFixed(0)}</span>
                         <StatusBadge status={withdrawal.status} />
                       </div>
                     )
                   } else {
                     const bet = entry as Bet | BettingHistoryEntry
                     return (
-                      <div key={bet.id} className="grid grid-cols-4 text-sm py-1">
-                        <div className="flex items-center space-x-1">
+                      <div key={bet.id} className="grid grid-cols-4 w-full table-fixed text-sm py-1">
+                        <div className="flex items-center space-x-1 truncate overflow-hidden">
                           <div className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center text-xs">
                             {bet.player.charAt(0)}
                           </div>
                           <span className="truncate">{bet.player}</span>
                         </div>
-                        <span className="text-xs">${bet.amount.toFixed(0)}</span>
-                        <span
-                          className={
-                            bet.status === "win" || bet.status === "cashed_out" ? "text-green-400" : "text-red-400"
-                          }
-                        >
+                        <span className="text-xs truncate">${bet.amount.toFixed(0)}</span>
+                        <span className={bet.status === "win" || bet.status === "cashed_out" ? "text-green-400" : "text-red-400"}>
                           {bet.status === "win" || bet.status === "cashed_out" ? `${bet.multiplier.toFixed(2)}x` : "-"}
                         </span>
-                        <WinLossDisplay status={bet.status} amount={bet.winAmount} />
+                        <div className="truncate overflow-hidden">
+                          <WinLossDisplay status={bet.status} amount={bet.winAmount} />
+                        </div>
                       </div>
                     )
                   }
@@ -1428,15 +1424,15 @@ export default function JetWinAviator() {
                 </div>
 
                 <div className="grid grid-cols-4 gap-2 mb-4">
-                  {[100, 250, 500, 1000].map((amount) => (
+                  {[100.1, 250, 500, 1000].map((amount) => (
                     <Button
                       key={amount}
                       variant="outline"
                       size="sm"
-                      onClick={() => setBetAmount(Math.max(100, amount))}
+                      onClick={() => setAutoCashout(Math.max(100.1, amount))}
                       className="bg-gray-600 border-gray-500 text-white text-xs"
                     >
-                      ${amount}
+                      {amount}x
                     </Button>
                   ))}
                 </div>
@@ -1459,10 +1455,10 @@ export default function JetWinAviator() {
                         <Input
                           type="number"
                           value={autoCashout}
-                          onChange={(e) => setAutoCashout(Math.max(100.0, Number.parseFloat(e.target.value) || 100.0))}
+                          onChange={(e) => setAutoCashout(Math.max(100.1, Number.parseFloat(e.target.value) || 100.1))}
                           className="w-20 bg-gray-600 border-gray-500 text-white text-center text-xs"
                           step="0.01"
-                          min="100"
+                          min="100.1"
                         />
                         <span className="text-sm text-gray-400">x</span>
                         <Button variant="ghost" size="sm" className="text-gray-400" onClick={() => setAutoCash(false)}>
@@ -1613,11 +1609,7 @@ export default function JetWinAviator() {
             variant={activeTab === "Betting History" ? "default" : "outline"}
             size="sm"
             onClick={() => setActiveTab("Betting History")}
-            className={
-              activeTab === "Betting History"
-                ? "bg-gray-700 text-white"
-                : "bg-transparent border-gray-600 text-gray-400"
-            }
+            className={activeTab === "Betting History" ? "bg-gray-700 text-white" : "bg-transparent border-gray-600 text-gray-400"}
           >
             Betting History
           </Button>
@@ -1625,11 +1617,7 @@ export default function JetWinAviator() {
             variant={activeTab === "Withdrawal History" ? "default" : "outline"}
             size="sm"
             onClick={() => setActiveTab("Withdrawal History")}
-            className={
-              activeTab === "Withdrawal History"
-                ? "bg-gray-700 text-white"
-                : "bg-transparent border-gray-600 text-gray-400"
-            }
+            className={activeTab === "Withdrawal History" ? "bg-gray-700 text-white" : "bg-transparent border-gray-600 text-gray-400"}
           >
             Withdrawal History
           </Button>
