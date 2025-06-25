@@ -8,6 +8,26 @@ import { Switch } from "@/components/ui/switch"
 import { User, Info, X, LogOut } from "lucide-react"
 import Link from "next/link"
 
+// StatusBadge Component
+const StatusBadge = ({ status }: { status: string }) => {
+  return (
+    <span
+      className={status === "completed" ? "text-green-400" : status === "pending" ? "text-yellow-400" : "text-red-400"}
+    >
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </span>
+  )
+}
+
+// WinLossDisplay Component
+const WinLossDisplay = ({ status, amount }: { status: string; amount: number }) => {
+  return (
+    <span className="text-sm font-bold text-yellow-400">
+      {status === "win" || status === "cashed_out" ? `+${amount.toFixed(2)}` : "Loss"}
+    </span>
+  )
+}
+
 interface Bet {
   id: string
   player: string
@@ -526,7 +546,7 @@ export default function JetWinAviator() {
   }
 
   // 🎯 BETTING FUNCTIONALITY - Place a bet when button is clicked
-  const placeBet = () => {
+  const placeBet = async () => { // Make the function async
     // ✅ Check if game is in waiting state (can only bet before plane takes off)
     if (gameState !== "waiting") {
       console.log("❌ Cannot place bet - game already started")
@@ -551,17 +571,59 @@ export default function JetWinAviator() {
       return
     }
 
+    // Retrieve user email and phone from localStorage or profile state
+    const userEmailFromStorage = localStorage.getItem("jetcash-user-email");
+    const userPhoneFromStorage = localStorage.getItem("jetcash-user-phone"); // Assuming phone is stored here
+
+    if (!userEmailFromStorage || !userPhoneFromStorage) {
+      console.error("User email or phone not found. Please log in.");
+      // Optionally, redirect to login or show an error message
+      return;
+    }
+
     // 🎲 PLACE THE BET - Deduct amount from balance and activate bet
     console.log(`🎯 Placing bet: $${betAmount.toFixed(2)}`)
     setBetActive(true)
     setBetCashed(false)
-    setBalance((prev) => {
-      const newBalance = prev - betAmount
-      console.log(`💰 Balance updated: $${prev.toFixed(2)} → $${newBalance.toFixed(2)}`)
-      return newBalance
-    })
 
-    console.log("✅ Bet placed successfully!")
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("https://av-backend-qp7e.onrender.com/api/deposits/placebet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: userEmailFromStorage,
+          betAmount: betAmount,
+          phone: userPhoneFromStorage,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log("Bet placed successfully:", data);
+        // Update balance with the new amount from the backend response
+        setBalance(data.newBalance); // Assuming the backend returns newBalance
+        console.log(`💰 Balance updated by backend: $${data.newBalance.toFixed(2)}`);
+      } else {
+        console.error("Failed to place bet:", data.message || "Unknown error");
+        // Revert bet state if API call fails
+        setBetActive(false);
+        setBetCashed(false);
+        // Optionally, show an error to the user
+      }
+    } catch (error) {
+      console.error("Error placing bet:", error);
+      // Revert bet state if network error
+      setBetActive(false);
+      setBetCashed(false);
+      // Optionally, show a network error to the user
+    }
+
+    console.log("✅ Bet placement process initiated!")
   }
 
   // 🤖 AUTO-BET FUNCTIONALITY - Automatically place bets each round
@@ -1093,12 +1155,7 @@ export default function JetWinAviator() {
                           <span className="truncate">{withdrawal.player}</span>
                         </div>
                         <span className="text-xs">${withdrawal.amount.toFixed(0)}</span>
-                        <span className={
-                          withdrawal.status === "completed" ? "text-green-400" :
-                          withdrawal.status === "pending" ? "text-yellow-400" : "text-red-400"
-                        }>
-                          {withdrawal.status.charAt(0).toUpperCase() + withdrawal.status.slice(1)}
-                        </span>
+                        <StatusBadge status={withdrawal.status} />
                       </div>
                     )
                   } else {
@@ -1115,9 +1172,7 @@ export default function JetWinAviator() {
                         <span className={bet.status === "win" || bet.status === "cashed_out" ? "text-green-400" : "text-red-400"}>
                           {bet.status === "win" || bet.status === "cashed_out" ? `${bet.multiplier.toFixed(2)}x` : "-"}
                         </span>
-                        <span className={bet.status === "win" || bet.status === "cashed_out" ? "text-green-400" : "text-red-400"}>
-                          {bet.status === "win" || bet.status === "cashed_out" ? `$${bet.winAmount.toFixed(0)}` : "$0"}
-                        </span>
+                        <WinLossDisplay status={bet.status} amount={bet.winAmount} />
                       </div>
                     )
                   }
@@ -1536,10 +1591,10 @@ export default function JetWinAviator() {
         </div>
       </div>
 
-  {/* Mobile History Content */}
+     {/* Mobile History Content */}
 <div
   className="md:hidden bg-gray-900 p-3 flex-1 overflow-y-auto"
-  style={{ height: "calc(100vh - 64px - 200px - 60px)" }} // Adjusted height for new tabs
+  style={{ height: "calc(100vh - 64px - 200px - 60px)" }} // Adjusted for tab layout
 >
   <div className="flex items-center justify-between mb-2">
     <div className="text-sm font-semibold text-white">
@@ -1554,6 +1609,7 @@ export default function JetWinAviator() {
       size="sm"
       onClick={() => setShowRules(!showRules)}
       className="bg-blue-600 hover:bg-blue-700 text-white"
+      aria-label={showRules ? "Hide game rules" : "Show game rules"}
     >
       <Info className="w-4 h-4" />
     </Button>
@@ -1564,15 +1620,19 @@ export default function JetWinAviator() {
       <div className="space-y-4 text-sm text-gray-300">
         <div>
           <h4 className="font-semibold text-white mb-2">How to Play</h4>
-          <p>1. Place your bet before the plane takes off</p>
-          <p>2. Watch the multiplier increase as the plane flies</p>
-          <p>3. Cash out before the plane flies away</p>
-          <p>4. The longer you wait, the higher the multiplier</p>
+          <ol className="list-decimal pl-5 space-y-1">
+            <li>Place your bet before the plane takes off</li>
+            <li>Watch the multiplier increase as the plane flies</li>
+            <li>Cash out before the plane flies away</li>
+            <li>The longer you wait, the higher the multiplier</li>
+          </ol>
         </div>
         <div>
           <h4 className="font-semibold text-white mb-2">Auto Features</h4>
-          <p>• Auto Bet: Automatically place bets each round</p>
-          <p>• Auto Cash Out: Automatically cash out at set multiplier</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Auto Bet: Automatically place bets each round</li>
+            <li>Auto Cash Out: Automatically cash out at set multiplier</li>
+          </ul>
         </div>
       </div>
     ) : (
@@ -1582,21 +1642,18 @@ export default function JetWinAviator() {
           return (
             <div key={withdrawal.id} className="bg-gray-800 p-4 rounded-lg flex items-start space-x-3">
               <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg">
-                {withdrawal.player.charAt(0)}
+                {withdrawal.player.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-semibold text-white">{withdrawal.player}</span>
-                  <span className="text-xs text-gray-400">{withdrawal.timestamp.toLocaleDateString()}</span>
+                  <span className="text-xs text-gray-400">
+                    {new Date(withdrawal.timestamp).toLocaleDateString()}
+                  </span>
                 </div>
                 <div className="text-xs text-gray-300 mb-1">Amount: ${withdrawal.amount.toFixed(2)}</div>
                 <div className="flex items-center justify-between">
-                  <span className={
-                    withdrawal.status === "completed" ? "text-green-400" :
-                    withdrawal.status === "pending" ? "text-yellow-400" : "text-red-400"
-                  }>
-                    {withdrawal.status.charAt(0).toUpperCase() + withdrawal.status.slice(1)}
-                  </span>
+                  <StatusBadge status={withdrawal.status} />
                 </div>
               </div>
             </div>
@@ -1606,19 +1663,24 @@ export default function JetWinAviator() {
           return (
             <div key={betHistory.id} className="bg-gray-800 p-4 rounded-lg flex items-start space-x-3">
               <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg">
-                {betHistory.player.charAt(0)}
+                {betHistory.player.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-semibold text-white">{betHistory.player}</span>
-                  <span className="text-xs text-gray-400">{betHistory.timestamp.toLocaleDateString()}</span>
+                  <span className="text-xs text-gray-400">
+                    {new Date(betHistory.timestamp).toLocaleDateString()}
+                  </span>
                 </div>
                 <div className="text-xs text-gray-300 mb-1">Bet: ${betHistory.amount.toFixed(2)}</div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-green-400">{betHistory.multiplier.toFixed(2)}x</span>
-                  <span className="text-sm font-bold text-yellow-400">
-                    {betHistory.status === "cashed_out" ? `+${betHistory.winAmount.toFixed(2)}` : "Loss"}
+                  <span className="text-sm font-bold text-green-400">
+                    {betHistory.multiplier.toFixed(2)}x
                   </span>
+                  <WinLossDisplay 
+                    status={betHistory.status} 
+                    amount={betHistory.winAmount} 
+                  />
                 </div>
               </div>
             </div>
@@ -1628,21 +1690,27 @@ export default function JetWinAviator() {
           return (
             <div key={bet.id} className="bg-gray-800 p-4 rounded-lg flex items-start space-x-3">
               <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg">
-                {bet.player.charAt(0)}
+                {bet.player.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-semibold text-white">{bet.player}</span>
                   <span className="text-xs text-gray-400">
-                    {activeTab === "Top" ? new Date().toLocaleDateString() : bet.timestamp.toLocaleDateString()}
+                    {activeTab === "Top" 
+                      ? new Date().toLocaleDateString() 
+                      : new Date(bet.timestamp).toLocaleDateString()
+                    }
                   </span>
                 </div>
                 <div className="text-xs text-gray-300 mb-1">Bet: ${bet.amount.toFixed(2)}</div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-green-400">{bet.multiplier.toFixed(2)}x</span>
-                  <span className="text-sm font-bold text-yellow-400">
-                    {bet.status === "win" ? `+${bet.winAmount.toFixed(2)}` : "Loss"}
+                  <span className="text-sm font-bold text-green-400">
+                    {bet.multiplier.toFixed(2)}x
                   </span>
+                  <WinLossDisplay 
+                    status={bet.status} 
+                    amount={bet.winAmount} 
+                  />
                 </div>
               </div>
             </div>
@@ -1652,7 +1720,7 @@ export default function JetWinAviator() {
     )}
   </div>
   
-  {/* Mobile Footer - only show on mobile, after cashout history */}
+  {/* Mobile Footer */}
   <footer className="bg-gray-800 border-t border-gray-700 p-4 text-center mt-2 md:hidden">
     <div className="flex items-center justify-center space-x-2 mb-2">
       <span className="text-sm text-gray-400">✓ Provably Fair Game</span>
@@ -1660,6 +1728,7 @@ export default function JetWinAviator() {
     <div className="text-xs text-gray-500">Powered by SPRIBE</div>
   </footer>
 </div>
+
       {/* Mobile Deposit Button */}
       <div className="md:hidden fixed bottom-4 right-4">
         <Link href={profile ? "/deposit" : "/login"}>
@@ -1720,66 +1789,28 @@ export default function JetWinAviator() {
         </div>
       )}
 
-      <style jsx>{`
-  @keyframes moveBackground {
-    0% {
-      background-position: 0 0, 0 0, 0 0;
-    }
-    100% {
-      background-position: 0 0, 100px 100px, -80px 80px;
-    }
-  }
-
-  @keyframes planeGlow {
-    0% {
-      filter: brightness(1.3) drop-shadow(0 0 5px rgba(255,255,255,0.5));
-    }
-    100% {
-      filter: brightness(1.5) drop-shadow(0 0 15px rgba(255,255,255,0.8));
-    }
-  }
-
-  @keyframes multiplierPulse {
-    0% {
-      text-shadow: 0 0 20px rgba(255,255,255,0.5);
-      transform: scale(1);
-    }
-    100% {
-      text-shadow: 0 0 30px rgba(255,255,255,0.8);
-      transform: scale(1.05);
-    }
-  }
-
-  /* 🛤️ ANIMATED DOTTED TRAIL */
-  @keyframes dashMove {
-    0% {
-      stroke-dashoffset: 0;
-    }
-    100% {
-      stroke-dashoffset: 12;
-    }
-  }
-
-  /* 🪢 SWINGING MULTIPLIER TAG */
-  @keyframes multiplierSwing {
-    0%, 100% {
-      transform: translateX(-50%) rotate(-2deg);
-    }
-    50% {
-      transform: translateX(-50%) rotate(2deg);
-    }
-  }
-
-  @keyframes graphFadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .flight-graph {
-    animation: graphFadeIn 0.5s ease-out;
-    z-index: 10;
-    box-shadow: 0 0 10px rgba(0,0,0,0.5);
-  }
-`}</style>
-    </div>
+{
+  /* WhatsApp Chatbot Icon - Floating Action Button */
+}
+<a
+  href="https://wa.me/254700447664"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="fixed bottom-4 left-4 md:bottom-8 md:left-8 bg-green-500 hover:bg-green-600 text-white p-3 rounded-full shadow-lg flex items-center justify-center z-50 transition-all duration-300 hover:scale-110"
+  aria-label="Chat with us on WhatsApp"
+>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className="w-6 h-6"
+  >
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+  </svg>
+  <span className="sr-only">WhatsApp Support</span>
+</a>
+</div>
   )
 }

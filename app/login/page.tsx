@@ -44,7 +44,7 @@ export default function LoginPage() {
       localStorage.setItem("jetcash-user-lastname", data.user.lastname)
 
       alert("Login successful")
-      window.location.href = "/" // Redirect to the main game page
+      window.location.href = "/" 
     } catch (error) {
       alert("Network error. Please try again.")
     } finally {
