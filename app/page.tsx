@@ -1021,9 +1021,9 @@ export default function JetWinAviator() {
       {/* Mobile Header */}
       <header className="bg-gray-800 border-b border-gray-700 p-4 md:hidden">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+          {/* <div className="flex items-center space-x-4">
             <div className="text-xl font-bold text-red-400">JetCash</div>
-          </div>
+          </div> */}
           <div className="flex items-center space-x-2">
             <span className="text-xs text-yellow-300 font-semibold">{greetingName}</span>
             <span className="text-green-400 font-bold text-sm">${balance.toFixed(2)}</span>
