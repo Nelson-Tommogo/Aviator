@@ -573,46 +573,250 @@ export default function DepositPageEarlySave() {
               </Card>
             )}
 
-            {/* Card and Bank sections remain the same */}
-            {depositMethod === "card" && (
-              <Card className="bg-gray-800 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center">
-                    <CreditCard className="w-5 h-5 mr-2 text-blue-500" />
-                    Card Payment
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">Pay with your credit or debit card</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="border border-dashed border-gray-600 rounded-lg p-6 text-center">
-                    <CreditCard className="w-10 h-10 mx-auto text-blue-400 mb-3" />
-                    <h3 className="font-medium text-white">Card Payments Coming Soon</h3>
-                    <p className="text-sm text-gray-400 mt-1">We're working to integrate secure card payments</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+          {/* Card Payment Form */}
+{depositMethod === "card" && (
+  <Card className="bg-gray-800 border-gray-700">
+    <CardHeader>
+      <CardTitle className="text-white flex items-center">
+        <CreditCard className="w-5 h-5 mr-2 text-blue-500" />
+        Card Payment
+      </CardTitle>
+      <CardDescription className="text-gray-400">Pay with your credit or debit card</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <form className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="card-name" className="text-white">
+            Name on Card
+          </Label>
+          <Input
+            id="card-name"
+            type="text"
+            placeholder="John Doe"
+            name="name"
+            value={cardDetails.name}
+            onChange={handleCardDetailsChange}
+            className="bg-gray-700 border-gray-600 text-white"
+            disabled
+          />
+        </div>
 
-            {depositMethod === "bank" && (
-              <Card className="bg-gray-800 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center">
-                    <Banknote className="w-5 h-5 mr-2 text-purple-500" />
-                    Bank Transfer
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">Transfer directly from your bank account</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="border border-dashed border-gray-600 rounded-lg p-6 text-center">
-                    <Banknote className="w-10 h-10 mx-auto text-purple-400 mb-3" />
-                    <h3 className="font-medium text-white">Bank Transfers Coming Soon</h3>
-                    <p className="text-sm text-gray-400 mt-1">We'll soon support direct bank transfers</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+        <div className="space-y-2">
+          <Label htmlFor="card-number" className="text-white">
+            Card Number
+          </Label>
+          <Input
+            id="card-number"
+            type="text"
+            placeholder="4242 4242 4242 4242"
+            name="number"
+            value={cardDetails.number}
+            onChange={handleCardDetailsChange}
+            className="bg-gray-700 border-gray-600 text-white"
+            disabled
+          />
+        </div>
 
-            {/* Transaction Information */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="card-expiry" className="text-white">
+              Expiry Date
+            </Label>
+            <Input
+              id="card-expiry"
+              type="text"
+              placeholder="MM/YY"
+              name="expiry"
+              value={cardDetails.expiry}
+              onChange={handleCardDetailsChange}
+              className="bg-gray-700 border-gray-600 text-white"
+              disabled
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="card-cvv" className="text-white">
+              CVV
+            </Label>
+            <Input
+              id="card-cvv"
+              type="text"
+              placeholder="123"
+              name="cvv"
+              value={cardDetails.cvv}
+              onChange={handleCardDetailsChange}
+              className="bg-gray-700 border-gray-600 text-white"
+              disabled
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="card-amount" className="text-white">
+            Amount ($)
+          </Label>
+          <Input
+            id="card-amount"
+            type="number"
+            placeholder="100"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="bg-gray-700 border-gray-600 text-white"
+            min="100"
+            disabled
+          />
+          <p className="text-xs text-gray-400">KES {kshAmount.toLocaleString()}</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          {quickAmounts.map((amt) => (
+            <Button
+              key={amt}
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setAmount(amt.toString())}
+              className="bg-gray-700 border-gray-600 text-white"
+              disabled
+            >
+              ${amt}
+            </Button>
+          ))}
+        </div>
+
+        <div className="border border-dashed border-blue-500 rounded-lg p-6 text-center bg-blue-900/10">
+          <CreditCard className="w-10 h-10 mx-auto text-blue-400 mb-3" />
+          <h3 className="font-medium text-white">Card Payments Coming Soon</h3>
+          <p className="text-sm text-gray-400 mt-1">
+            We're working to integrate secure card payments with PCI compliance
+          </p>
+        </div>
+
+        <Button
+          type="button"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3"
+          disabled
+        >
+          Pay with Card (Coming Soon)
+        </Button>
+      </form>
+    </CardContent>
+  </Card>
+)}
+
+{/* Bank Transfer Form */}
+{depositMethod === "bank" && (
+  <Card className="bg-gray-800 border-gray-700">
+    <CardHeader>
+      <CardTitle className="text-white flex items-center">
+        <Banknote className="w-5 h-5 mr-2 text-purple-500" />
+        Bank Transfer
+      </CardTitle>
+      <CardDescription className="text-gray-400">
+        Transfer directly from your bank account
+      </CardDescription>
+    </CardHeader>
+    <CardContent>
+      <form className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="bank-name" className="text-white">
+            Full Name
+          </Label>
+          <Input
+            id="bank-name"
+            type="text"
+            placeholder="As shown on bank account"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="bg-gray-700 border-gray-600 text-white"
+            disabled
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="bank-account" className="text-white">
+            Bank Account Number
+          </Label>
+          <Input
+            id="bank-account"
+            type="text"
+            placeholder="1234567890"
+            className="bg-gray-700 border-gray-600 text-white"
+            disabled
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="bank-name" className="text-white">
+            Bank Name
+          </Label>
+          <select
+            id="bank-name"
+            className="w-full bg-gray-700 border-gray-600 text-white rounded-md p-2 border"
+            disabled
+          >
+            <option value="">Select your bank</option>
+            <option value="equity">Equity Bank</option>
+            <option value="kcb">KCB Bank</option>
+            <option value="coop">Co-operative Bank</option>
+            <option value="standard">Standard Chartered</option>
+            <option value="absa">Absa Bank</option>
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="bank-amount" className="text-white">
+            Amount ($)
+          </Label>
+          <Input
+            id="bank-amount"
+            type="number"
+            placeholder="100"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="bg-gray-700 border-gray-600 text-white"
+            min="100"
+            disabled
+          />
+          <p className="text-xs text-gray-400">KES {kshAmount.toLocaleString()}</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          {quickAmounts.map((amt) => (
+            <Button
+              key={amt}
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setAmount(amt.toString())}
+              className="bg-gray-700 border-gray-600 text-white"
+              disabled
+            >
+              ${amt}
+            </Button>
+          ))}
+        </div>
+
+        <div className="border border-dashed border-purple-500 rounded-lg p-6 text-center bg-purple-900/10">
+          <Banknote className="w-10 h-10 mx-auto text-purple-400 mb-3" />
+          <h3 className="font-medium text-white">Bank Transfers Coming Soon</h3>
+          <p className="text-sm text-gray-400 mt-1">
+            We'll soon support direct bank transfers from major Kenyan banks
+          </p>
+        </div>
+
+        <Button
+          type="button"
+          className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3"
+          disabled
+        >
+          Get Bank Details (Coming Soon)
+        </Button>
+      </form>
+    </CardContent>
+  </Card>
+)}
+    {/* Transaction Information */}
             <Card className="bg-gray-800 border-gray-700 mt-6">
               <CardHeader>
                 <CardTitle className="text-white text-lg">Deposit Information</CardTitle>
