@@ -65,7 +65,7 @@ export default function LoginPage() {
       }
 
       alert("Login successful")
-      window.location.href = "/" // Redirect to the main game page
+      window.location.href = "/" 
     } catch (error) {
       alert("Network error. Please try again.")
     } finally {
