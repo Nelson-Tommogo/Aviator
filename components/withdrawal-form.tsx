@@ -13,7 +13,7 @@ interface WithdrawalFormProps {
 }
 
 export function WithdrawalForm({ onClose, onWithdraw, balance }: WithdrawalFormProps) {
-  const [amount, setAmount] = useState<number>(10000)
+  const [amount, setAmount] = useState<number>(1000)
   const [method, setMethod] = useState<"phone" | "bank">("phone")
   const [details, setDetails] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
@@ -21,8 +21,8 @@ export function WithdrawalForm({ onClose, onWithdraw, balance }: WithdrawalFormP
 
   const handleSubmit = async () => {
     setError(null)
-    if (amount < 10000) {
-      setError("Minimum withdrawal amount is $10000.")
+    if (amount < 1000) {
+      setError("Minimum withdrawal amount is $1000.")
       return
     }
     if (amount > balance) {
@@ -70,12 +70,12 @@ export function WithdrawalForm({ onClose, onWithdraw, balance }: WithdrawalFormP
             type="number"
             value={amount}
             onChange={(e) => setAmount(Number(e.target.value))}
-            min={10000}
+            min={1000}
             step={10}
             className="bg-gray-800 border border-gray-700 text-white"
           />
           <p className="text-xs text-gray-400 mt-1">
-            Minimum withdrawal: $10000. Your current balance: ${balance.toFixed(2)}
+            Minimum withdrawal: $1000. Your current balance: ${balance.toFixed(2)}
           </p>
         </div>
 
