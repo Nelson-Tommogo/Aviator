@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Volume2, User, Info, X, LogOut } from "lucide-react"
+import { User, Info, X, LogOut } from "lucide-react"
 import Link from "next/link"
 
 interface Bet {
@@ -67,6 +67,14 @@ export default function JetWinAviator() {
   const welcomeAudioRef = useRef<HTMLAudioElement>(null)
   const flewAudioRef = useRef<HTMLAudioElement>(null)
   const gameCanvasRef = useRef<HTMLDivElement>(null)
+
+  // Function to get dynamic greeting based on time of day
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return "Good Morning"
+    if (hour < 18) return "Good Afternoon"
+    return "Good Evening"
+  }
 
   // Generate anonymous player name
   const generatePlayerName = () => {
@@ -145,9 +153,6 @@ export default function JetWinAviator() {
     if (email) {
       setUserEmail(email)
       setIsAdmin(email === "admin@gmail.com")
-      // Greeting name logic
-      const namePart = email.split("@")[0]
-      setGreetingName(namePart.charAt(0).toUpperCase() + namePart.slice(1))
       // Fetch profile
       fetch("https://av-backend-qp7e.onrender.com/api/users/profile", {
         method: "GET",
@@ -155,23 +160,41 @@ export default function JetWinAviator() {
       })
         .then((res) => res.json())
         .then((authData) => {
-          const emailToFetch = authData.user?.email || userEmail
+          setProfile(authData.user) // Set the full user profile first
 
-          // Set greeting name from profile data
-          let name = ""
-          if (authData.user?.firstname && authData.user?.lastname) {
-            name = `${authData.user.firstname} ${authData.user.lastname}`
-          } else if (authData.user?.lastname) {
-            name = authData.user.lastname
-          } else if (authData.user?.firstname) {
-            name = authData.user.firstname
-          } else {
-            name = emailToFetch.split("@")[0] // Fallback to email part
+          let display_name = "User" // Default fallback
+          if (authData.user) {
+            if (authData.user.firstname && authData.user.lastname) {
+              display_name = `${authData.user.firstname} ${authData.user.lastname}`
+            } else if (authData.user.firstname) {
+              display_name = authData.user.firstname
+            } else if (authData.user.lastname) {
+              display_name = authData.user.lastname
+            } else if (authData.user.email) {
+              // Fallback to email part if no name fields
+              display_name = authData.user.email.split("@")[0]
+            }
+          } else if (email) {
+            // If authData.user is null but email exists in local storage
+            display_name = email.split("@")[0]
           }
-          setGreetingName(name.charAt(0).toUpperCase() + name.slice(1)) // Capitalize first letter
-          setProfile(authData.user) // Set the full user profile
+
+          setGreetingName(`${getGreeting()}, ${display_name.charAt(0).toUpperCase() + display_name.slice(1)}`)
         })
-        .catch(() => setProfile(null))
+        .catch((error) => {
+          console.error("Error fetching profile:", error)
+          setProfile(null)
+          // If profile fetch fails, still try to set greeting from local storage email
+          if (email) {
+            const namePart = email.split("@")[0]
+            setGreetingName(`${getGreeting()}, ${namePart.charAt(0).toUpperCase() + namePart.slice(1)}`)
+          } else {
+            setGreetingName(`${getGreeting()}, Guest`)
+          }
+        })
+    } else {
+      // If no email in local storage, set a generic greeting
+      setGreetingName(`${getGreeting()}, Guest`)
     }
 
     // Load music preference
@@ -199,32 +222,6 @@ export default function JetWinAviator() {
     const token = localStorage.getItem("token")
     const emailToFetch = localStorage.getItem("jetcash-user-email")
 
-    // In the `useEffect` hook where the deposit amount is fetched, locate the `fetch` call to `api/deposits/by-email`.
-    // Change the method from "POST" to "GET".
-    // Modify the URL to include the email as a query parameter.
-    // Update the body to be removed for a GET request.
-    // Modify the response handling to sum the 'amount' from all objects in the array.
-
-    // OLD CODE:
-    // fetch("https://av-backend-qp7e.onrender.com/api/deposits/by-email", {
-    //   method: "POST",
-    //   headers: {
-    //     "Content-Type": "application/json",
-    //     "Authorization": `Bearer ${token}`,
-    //   },
-    //   body: JSON.stringify({ email: emailToFetch }),
-    // })
-    //   .then(res => res.json())
-    //   .then(dep => {
-    //     let total = 0;
-    //     if (typeof dep.amount === "number") total += dep.amount;
-    //     if (typeof dep.deposit === "number") total += dep.deposit;
-    //     if (total > 0) {
-    //       setBalance(total);
-    //     }
-    //   })
-
-    // NEW CODE:
     fetch(`https://av-backend-qp7e.onrender.com/api/deposits/by-email?email=${emailToFetch}`, {
       method: "GET",
       headers: {
@@ -888,15 +885,12 @@ export default function JetWinAviator() {
               ${balance.toFixed(2)}
               {profile && (
                 <span className="text-xs text-green-300 ml-1">
-                  {greetingName ? `Hello ${greetingName}` : ""}
+                  {greetingName}
                   {profile.phone && ` | ${profile.phone}`}
                 </span>
               )}
             </div>
             <div className="flex items-center space-x-2">
-              <Button size="sm" variant="ghost" onClick={toggleMusic} className="p-1">
-                <Volume2 className="w-4 h-4" />
-              </Button>
               {profile ? (
                 <Button size="sm" variant="ghost" className="p-1" onClick={handleLogout}>
                   <LogOut className="w-4 h-4" />
@@ -919,7 +913,7 @@ export default function JetWinAviator() {
           <div className="flex items-center space-x-4">
             <div className="text-2xl font-bold text-yellow-400">JetCash!</div>
             {isAdmin && <Badge className="bg-red-600 text-white">ADMIN MODE</Badge>}
-            {profile && <span className="ml-4 text-lg text-green-400">Hello {greetingName}</span>}
+            {profile && <span className="ml-4 text-lg text-green-400">{greetingName}</span>}
             {profile && (
               <span className="ml-4 text-sm text-gray-300">{profile.phone ? `Phone: ${profile.phone}` : ""}</span>
             )}
@@ -945,9 +939,6 @@ export default function JetWinAviator() {
 
           <div className="flex items-center space-x-4">
             <div className="text-green-400 font-bold">${balance.toFixed(2)}</div>
-            <Button size="sm" variant="ghost" onClick={toggleMusic}>
-              <Volume2 className="w-5 h-5" />
-            </Button>
             {profile ? (
               <Button size="sm" variant="ghost" onClick={handleLogout}>
                 <LogOut className="w-5 h-5" />
@@ -959,7 +950,7 @@ export default function JetWinAviator() {
                 </Button>
               </Link>
             )}
-            <Link href="/deposit">
+            <Link href={profile ? "/deposit" : "/login"}>
               <Button className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold">Deposit</Button>
             </Link>
           </div>
@@ -1460,7 +1451,7 @@ export default function JetWinAviator() {
 
       {/* Mobile Deposit Button */}
       <div className="md:hidden fixed bottom-4 right-4">
-        <Link href="/deposit">
+        <Link href={profile ? "/deposit" : "/login"}>
           <Button className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-6 py-3 rounded-full shadow-lg">
             Deposit
           </Button>
