@@ -17,10 +17,13 @@ export function WithdrawalForm({ onClose, onWithdraw, balance }: WithdrawalFormP
   const [method, setMethod] = useState<"phone" | "bank">("phone")
   const [details, setDetails] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
 
   const handleSubmit = async () => {
     setError(null)
+    setSuccess(null)
+
     if (amount < 1000) {
       setError("Minimum withdrawal amount is $1000.")
       return
@@ -37,7 +40,16 @@ export function WithdrawalForm({ onClose, onWithdraw, balance }: WithdrawalFormP
     setIsSubmitting(true)
     try {
       await onWithdraw(amount, method, details)
-      onClose() // Close form on successful withdrawal
+
+      // ✅ Show success message if withdrawal is over 1000
+      if (amount >= 1000) {
+        setSuccess("Amount will be deposited shortly. ✅ Success!")
+      }
+
+      // Optional: Delay before closing
+      setTimeout(() => {
+        onClose()
+      }, 2000)
     } catch (err: any) {
       setError(err.message || "Withdrawal failed. Please try again.")
     } finally {
@@ -60,6 +72,7 @@ export function WithdrawalForm({ onClose, onWithdraw, balance }: WithdrawalFormP
         <h2 className="text-2xl font-bold text-white mb-4 text-center">Withdraw Funds</h2>
 
         {error && <p className="text-red-500 text-sm mb-4 text-center">{error}</p>}
+        {success && <p className="text-green-500 text-sm mb-4 text-center">{success}</p>}
 
         <div className="mb-4">
           <Label htmlFor="withdrawal-amount" className="block text-sm font-medium text-gray-300 mb-1">
