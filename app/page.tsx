@@ -550,26 +550,7 @@ export default function JetWinAviator() {
 
   // 🎯 BETTING FUNCTIONALITY - Place a bet when button is clicked
   const placeBet = async () => {
-    // Make the function async
-    // ✅ Check if game is in waiting state (can only bet before plane takes off)
-    if (gameState !== "waiting") {
-      console.log("❌ Cannot place bet - game already started")
-      return
-    }
-
-    // ✅ Check if player has sufficient balance
-    if (betAmount > balance) {
-      console.log("❌ Insufficient balance for bet")
-      return
-    }
-
-    // ✅ Check if bet is already active (prevent double betting)
-    if (betActive) {
-      console.log("❌ Bet already placed for this round")
-      return
-    }
-
-    // ✅ Check if bet amount is at least $100
+    // Only check for minimum bet amount
     if (betAmount < 100) {
       console.log("❌ Minimum bet amount is $100")
       return
@@ -581,21 +562,16 @@ export default function JetWinAviator() {
 
     if (!userEmailFromStorage || !userPhoneFromStorage) {
       console.error("User email or phone not found. Please log in.")
-      // Optionally, redirect to login or show an error message
       return
     }
 
-    // 🎲 PLACE THE BET - Deduct amount from balance and activate bet
-    console.log(`🎯 Placing bet: $${betAmount.toFixed(2)}`)
-    setBetActive(true)
-    setBetCashed(false)
-
+    // Always send the request to the backend
     const payload = {
       email: userEmailFromStorage,
       betAmount: betAmount,
       phone: userPhoneFromStorage,
     }
-    console.log("Sending payload to placebet endpoint:", payload) // Log the payload
+    console.log("Sending payload to placebet endpoint:", payload)
 
     try {
       const token = localStorage.getItem("token")
@@ -613,26 +589,16 @@ export default function JetWinAviator() {
       if (response.ok) {
         console.log("Bet placed successfully:", data)
         if (typeof data.newBalance === "number") {
-          // Ensure newBalance is a number
           setBalance(data.newBalance)
           console.log(`💰 Balance updated by backend: $${data.newBalance.toFixed(2)}`)
         } else {
           console.warn("Backend response did not contain a valid newBalance. Current balance might be out of sync.")
-          // Optionally, re-fetch balance or show a warning to the user
         }
       } else {
         console.error("Failed to place bet:", data.message || "Unknown error")
-        // Revert bet state if API call fails
-        setBetActive(false)
-        setBetCashed(false)
-        // Optionally, show an error to the user
       }
     } catch (error) {
       console.error("Error placing bet:", error)
-      // Revert bet state if network error
-      setBetActive(false)
-      setBetCashed(false)
-      // Optionally, show a network error to the user
     }
 
     console.log("✅ Bet placement process initiated!")
@@ -1482,7 +1448,7 @@ export default function JetWinAviator() {
                 {gameState === "waiting" ? (
                   <Button
                     onClick={placeBet}
-                    disabled={betActive || betAmount > balance || betAmount < 100}
+                    disabled={betAmount < 100}
                     className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-6 text-lg"
                   >
                     Bet
