@@ -557,22 +557,20 @@ export default function JetWinAviator() {
       return
     }
 
-    // Retrieve user email and phone from localStorage or profile state
+    // Retrieve user email from localStorage
     const userEmailFromStorage = localStorage.getItem("jetcash-user-email")
-    const userPhoneFromStorage = localStorage.getItem("jetcash-user-phone") // Assuming phone is stored here
 
-    if (!userEmailFromStorage || !userPhoneFromStorage) {
-      setBetError("User email or phone not found. Please log in.")
+    if (!userEmailFromStorage) {
+      setBetError("User email not found. Please log in.")
       return
     }
 
     setBetError("") // Clear previous error
 
-    // Always send the request to the backend
+    // Only send email and betAmount
     const payload = {
       email: userEmailFromStorage,
       betAmount: betAmount,
-      phone: userPhoneFromStorage,
     }
     console.log("Sending payload to placebet endpoint:", payload)
 
