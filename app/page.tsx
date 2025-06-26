@@ -96,6 +96,7 @@ export default function JetWinAviator() {
   const [profile, setProfile] = useState<any>(null)
   const [greetingName, setGreetingName] = useState("")
   const [showWithdrawalForm, setShowWithdrawalForm] = useState(false)
+  const [betError, setBetError] = useState("") // New state for bet error
 
   const audioRef = useRef<HTMLAudioElement>(null)
   const crashAudioRef = useRef<HTMLAudioElement>(null)
@@ -552,7 +553,7 @@ export default function JetWinAviator() {
   const placeBet = async () => {
     // Only check for minimum bet amount
     if (betAmount < 100) {
-      console.log("❌ Minimum bet amount is $100")
+      setBetError("Minimum bet amount is $100")
       return
     }
 
@@ -561,9 +562,11 @@ export default function JetWinAviator() {
     const userPhoneFromStorage = localStorage.getItem("jetcash-user-phone") // Assuming phone is stored here
 
     if (!userEmailFromStorage || !userPhoneFromStorage) {
-      console.error("User email or phone not found. Please log in.")
+      setBetError("User email or phone not found. Please log in.")
       return
     }
+
+    setBetError("") // Clear previous error
 
     // Always send the request to the backend
     const payload = {
@@ -594,10 +597,13 @@ export default function JetWinAviator() {
         } else {
           console.warn("Backend response did not contain a valid newBalance. Current balance might be out of sync.")
         }
+        setBetError("") // Clear error on success
       } else {
+        setBetError(data.message || "Failed to place bet.")
         console.error("Failed to place bet:", data.message || "Unknown error")
       }
     } catch (error) {
+      setBetError("Network error. Please try again.")
       console.error("Error placing bet:", error)
     }
 
@@ -1446,14 +1452,19 @@ export default function JetWinAviator() {
                 )}
 
                 {gameState === "waiting" ? (
-                  <Button
-                    onClick={placeBet}
-                    disabled={betAmount < 100}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-6 text-lg"
-                  >
-                    Bet
-                    <br />${betAmount.toFixed(2)}
-                  </Button>
+                  <>
+                    {betError && (
+                      <div className="mb-2 text-red-400 text-center text-sm font-semibold">{betError}</div>
+                    )}
+                    <Button
+                      onClick={placeBet}
+                      disabled={betAmount < 100}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-6 text-lg"
+                    >
+                      Bet
+                      <br />${betAmount.toFixed(2)}
+                    </Button>
+                  </>
                 ) : betActive && !betCashed ? (
                   <Button
                     onClick={cashOut}
